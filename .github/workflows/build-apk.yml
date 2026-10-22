@@ -1,4 +1,3 @@
-
 name: Build SuperiOA APK
 
 on:
@@ -41,16 +40,12 @@ jobs:
         run: |
           test -f settings.gradle.kts || test -f settings.gradle
           test -f app/build.gradle.kts || test -f app/build.gradle
+          test -f gradlew
 
       - name: Run unit tests
         run: |
-          if [ -f ./gradlew ]; then
-            chmod +x ./gradlew
-            ./gradlew --no-daemon :app:testDebugUnitTest
-          else
-            echo "ERROR: Gradle Wrapper (gradlew) is missing."
-            exit 1
-          fi
+          chmod +x ./gradlew
+          ./gradlew --no-daemon :app:testDebugUnitTest
 
       - name: Build Debug APK
         run: ./gradlew --no-daemon :app:assembleDebug
