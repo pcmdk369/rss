@@ -51,7 +51,7 @@ jobs:
           ./gradlew --no-daemon :app:testDebugUnitTest
 
             - name: Accept Android SDK licenses
-        run: |
+    
           set -o pipefail
           yes | sdkmanager --licenses
 
