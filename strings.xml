@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">SuperiOA</string>
+    <string name="a11y_description">SuperiOA reads on-screen text and performs taps, typing and scrolling only while you run a task that you started. You can stop it at any time. It never completes CAPTCHA, OTP, password, biometric or payment steps for you.</string>
+</resources>
