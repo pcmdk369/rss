@@ -2,9 +2,7 @@ name: Build SuperiOA APK
 
 on:
   push:
-    branches:
-      - main
-      - master
+    branches: [main, master]
   workflow_dispatch:
 
 permissions:
@@ -14,6 +12,10 @@ jobs:
   build:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+
+    env:
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
 
     steps:
       - name: Checkout repository
@@ -25,35 +27,38 @@ jobs:
           distribution: temurin
           java-version: '17'
           cache: gradle
-          
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
 
-      - name: Accept Android SDK licenses
-        run: yes | sdkmanager --licenses
-
-      - name: Install Android SDK packages
+      - name: Prepare Android SDK
         run: |
-          sdkmanager --install \
+          echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
+          echo "$ANDROID_HOME/platform-tools" >> "$GITHUB_PATH"
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -f "$SDKMANAGER" ]; then
+            SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -name sdkmanager -type f | head -n 1)"
+          fi
+          test -n "$SDKMANAGER"
+          chmod +x "$SDKMANAGER"
+          echo "SDK Manager: $SDKMANAGER"
+          yes | "$SDKMANAGER" --sdk_root="$ANDROID_HOME" --licenses || true
+          "$SDKMANAGER" --sdk_root="$ANDROID_HOME" \
             "platform-tools" \
             "platforms;android-34" \
             "build-tools;34.0.0"
-            
+          yes | "$SDKMANAGER" --sdk_root="$ANDROID_HOME" --licenses
+
       - name: Verify Android project
         run: |
           test -f settings.gradle.kts || test -f settings.gradle
           test -f app/build.gradle.kts || test -f app/build.gradle
           test -f gradlew
+          chmod +x gradlew
+          java -version
 
       - name: Run unit tests
-        run: |
-          chmod +x ./gradlew
-          ./gradlew --no-daemon :app:testDebugUnitTest
+        run: ./gradlew --no-daemon :app:testDebugUnitTest
 
-            - name: Accept Android SDK licenses
-    
-          set -o pipefail
-          yes | sdkmanager --licenses
+      - name: Build Debug APK
+        run: ./gradlew --no-daemon :app:assembleDebug
 
       - name: Verify APK
         run: |
