@@ -25,9 +25,12 @@ jobs:
           distribution: temurin
           java-version: '17'
           cache: gradle
-
+          
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+
+      - name: Accept Android SDK licenses
+        run: yes | sdkmanager --licenses
 
       - name: Install Android SDK packages
         run: |
@@ -35,7 +38,7 @@ jobs:
             "platform-tools" \
             "platforms;android-34" \
             "build-tools;34.0.0"
-
+            
       - name: Verify Android project
         run: |
           test -f settings.gradle.kts || test -f settings.gradle
