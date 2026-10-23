@@ -30,6 +30,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var onboarded by mutableStateOf(settings.onboarded)
         private set
+    @set:JvmName("setTtsState")
     var tts by mutableStateOf(settings.ttsEnabled)
         private set
 

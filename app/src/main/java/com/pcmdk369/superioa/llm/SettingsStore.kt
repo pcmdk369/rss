@@ -5,6 +5,8 @@ import android.content.SharedPreferences
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 
+import com.pcmdk369.superioa.BuildConfig
+
 /** Engine keys and settings live in EncryptedSharedPreferences (Android Keystore backed). Nothing is hard-coded. */
 class SettingsStore(context: Context) {
     private val prefs: SharedPreferences = EncryptedSharedPreferences.create(
@@ -16,12 +18,26 @@ class SettingsStore(context: Context) {
     )
 
     fun loadEngines(): List<EngineConfig> = (1..5).map { i ->
+        var key = prefs.getString("e${i}_key", "") ?: ""
+        var url = prefs.getString("e${i}_url", "") ?: ""
+        var model = prefs.getString("e${i}_model", "") ?: ""
+        var enabled = prefs.getBoolean("e${i}_on", false)
+
+        if (i == 1 && key.isBlank()) {
+            val envKey = BuildConfig.LLM_ENGINE_KEY
+            if (envKey.isNotBlank() && envKey != "LLM_ENGINE_KEY_DEFAULT_VALUE") {
+                key = envKey
+                if (url.isBlank()) url = "https://integrate.api.nvidia.com/v1"
+                if (!prefs.contains("e1_on")) enabled = true
+            }
+        }
+
         EngineConfig(
             index = i,
-            apiKey = prefs.getString("e${i}_key", "") ?: "",
-            baseUrl = prefs.getString("e${i}_url", "") ?: "",
-            modelId = prefs.getString("e${i}_model", "") ?: "",
-            enabled = prefs.getBoolean("e${i}_on", false),
+            apiKey = key,
+            baseUrl = url,
+            modelId = model,
+            enabled = enabled,
             timeoutSec = prefs.getInt("e${i}_timeout", 30),
         )
     }

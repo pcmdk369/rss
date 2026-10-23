@@ -33,7 +33,10 @@ import kotlin.coroutines.resumeWithException
 class OpenAiCompatibleCaller(private val http: OkHttpClient = OkHttpClient()) : EngineCaller {
 
     override suspend fun call(engine: EngineConfig, system: String, user: String): String {
-        val base = engine.baseUrl.trim().trimEnd('/')
+        var base = engine.baseUrl.trim().trimEnd('/')
+        if (base.endsWith("/chat/completions")) {
+            base = base.substringBeforeLast("/chat/completions").trimEnd('/')
+        }
         if (!base.startsWith("https://")) {
             throw EngineError.Config("Engine ${engine.index}: base URL must start with https://")
         }
