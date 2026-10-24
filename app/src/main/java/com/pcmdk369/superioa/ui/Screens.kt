@@ -2,6 +2,7 @@ package com.pcmdk369.superioa.ui
 
 import android.content.ActivityNotFoundException
 import android.content.Intent
+import android.net.Uri
 import android.provider.Settings
 import android.speech.RecognizerIntent
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -117,7 +118,10 @@ fun OnboardingScreen(vm: MainViewModel) {
         OutlinedButton(onClick = {
             ctx.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         }) { Text("Open Accessibility settings") }
-        Text("In that screen choose SuperiOA and turn it on. Android shows its own consent dialog.")
+        OutlinedButton(onClick = {
+            ctx.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${ctx.packageName}")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        }) { Text("Open SuperiOA app info") }
+        Text("If Android shows Restricted setting, open SuperiOA app info and look for Allow restricted settings in the app-info menu. If your phone does not offer that option, Android/OEM policy may block Accessibility for this install source; the app cannot enable it by itself.")
         Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
             Checkbox(checked = agreed, onCheckedChange = { agreed = it })
             Text("I understand and agree")
@@ -222,9 +226,13 @@ fun SettingsScreen(vm: MainViewModel) {
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Text("Settings", style = MaterialTheme.typography.headlineSmall)
+        Text("Accessibility is a protected Android setting. SuperiOA cannot grant it automatically. If blocked as a restricted setting, use App info to look for the Android-provided allow option.")
         OutlinedButton(onClick = {
             ctx.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         }) { Text("Open Accessibility settings") }
+        OutlinedButton(onClick = {
+            ctx.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${ctx.packageName}")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        }) { Text("Open SuperiOA app info") }
 
         Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
             Switch(checked = vm.tts, onCheckedChange = { vm.setTts(it) })
