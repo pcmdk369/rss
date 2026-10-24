@@ -9,7 +9,12 @@ Kotlin + Jetpack Compose, Room, EncryptedSharedPreferences, OkHttp. minSdk 26, t
 ## Get the APK (no Android Studio needed)
 1. Create a GitHub repository and push this folder to the `main` branch.
 2. Open the repo's **Actions** tab, **Build APK**, and wait for it to finish (or press *Run workflow*).
-3. Download the artifact **SuperiOA-debug-apk**, unzip, copy `app-debug.apk` to your phone and install it (allow "install unknown apps").
+3. Download the artifact **SuperiOA-debug-apk** from the newest successful run, unzip it, and install `app-debug.apk` (allow "install unknown apps").
+
+### Android install and Accessibility troubleshooting
+- **“Update failed” / “App not installed”**: GitHub-hosted runners generate a debug signing key per clean runner. A new debug APK may not update an older APK signed by a different key. If you do not need the old app's local data, uninstall the old SuperiOA first, then install the APK from the newest successful run. Uninstalling deletes local app data.
+- **“Restricted setting” when enabling Accessibility**: this is enforced by Android for some sideloaded apps. Open SuperiOA's App info and look for Android's “Allow restricted settings” option (sometimes in the overflow menu). If your device does not expose that option, install via Android Debug Bridge (ADB) from a trusted computer, or consult your device maker's instructions. The app cannot grant this protected setting itself.
+- The app needs an enabled LLM engine in **Settings** with a valid HTTPS OpenAI-compatible `/chat/completions` endpoint, model ID, and API key. Do not share API keys in screenshots or public issues.
 The workflow also runs the unit tests; failures are uploaded as `test-reports`.
 
 ## Build locally
