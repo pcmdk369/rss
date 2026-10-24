@@ -23,13 +23,19 @@ class SettingsStore(context: Context) {
         var model = prefs.getString("e${i}_model", "") ?: ""
         var enabled = prefs.getBoolean("e${i}_on", false)
 
-        if (i == 1 && key.isBlank()) {
+        if (i == 1) {
             val envKey = BuildConfig.LLM_ENGINE_KEY
-            if (envKey.isNotBlank() && envKey != "LLM_ENGINE_KEY_DEFAULT_VALUE") {
+            if (key.isBlank() && envKey.isNotBlank() && envKey != "LLM_ENGINE_KEY_DEFAULT_VALUE") {
                 key = envKey
-                if (url.isBlank()) url = "https://integrate.api.nvidia.com/v1"
                 if (!prefs.contains("e1_on")) enabled = true
             }
+            // NVIDIA accepts the API root; normalize users who paste the full endpoint.
+            if (url.isBlank()) url = "https://integrate.api.nvidia.com/v1"
+            url = url.trim().trimEnd('/')
+            if (url.endsWith("/chat/completions", ignoreCase = true)) {
+                url = url.substringBeforeLast("/chat/completions").trimEnd('/')
+            }
+            if (model.isBlank()) model = "meta/llama-3.3-nemotron-super-49b-v1.5"
         }
 
         EngineConfig(
