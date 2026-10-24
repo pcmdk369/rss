@@ -1,70 +1,68 @@
-name: Build SuperiOA APK
+name: Build SuperiOA APK and checks
 
 on:
   push:
     branches: [main, master]
+  pull_request:
   workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  build:
+  android:
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
-
+    timeout-minutes: 35
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Java 17
-        uses: actions/setup-java@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
           cache: gradle
-
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v4
+      - uses: android-actions/setup-android@v4
         with:
-          packages: 'platform-tools'
+          packages: 'platform-tools platforms;android-34 build-tools;34.0.0'
           accept-android-sdk-licenses: true
           log-accepted-android-sdk-licenses: false
-
-      - name: Verify Android project
+      - name: Build Gradle wrapper if absent
         run: |
-          test -f settings.gradle.kts || test -f settings.gradle
-          test -f app/build.gradle.kts || test -f app/build.gradle
-          if [ ! -f gradlew ]; then
-            gradle wrapper --gradle-version 8.9
-          fi
+          if [ ! -f gradlew ]; then gradle wrapper --gradle-version 8.9; fi
           chmod +x gradlew
-          java -version
-
-      - name: Run unit tests
-        run: ./gradlew --no-daemon :app:testDebugUnitTest
-
+      - name: Run Kotlin core and Android unit tests
+        run: ./gradlew --no-daemon :core:test :app:testDebugUnitTest
       - name: Build Debug APK
         run: ./gradlew --no-daemon :app:assembleDebug
-
       - name: Verify APK
-        run: |
-          find app/build/outputs/apk/debug -name '*.apk' -print
-          test -n "$(find app/build/outputs/apk/debug -name '*.apk' -print -quit)"
-
-      - name: Upload Debug APK
-        uses: actions/upload-artifact@v4
+        run: test -n "$(find app/build/outputs/apk/debug -name '*.apk' -print -quit)"
+      - uses: actions/upload-artifact@v4
         with:
           name: SuperiOA-debug-apk
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
-          retention-days: 7
-
-      - name: Upload test reports
+          retention-days: 14
+      - uses: actions/upload-artifact@v4
         if: always()
-        uses: actions/upload-artifact@v4
         with:
           name: SuperiOA-test-reports
           path: app/build/reports/tests/
           if-no-files-found: ignore
           retention-days: 7
+
+  backend:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - run: deno check supabase/functions/agent-execute/index.ts
+      - run: deno test supabase/functions/agent-execute/
+      - run: deno fmt --check supabase/functions/agent-execute/
