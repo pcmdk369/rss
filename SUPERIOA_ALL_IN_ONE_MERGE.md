@@ -20,3 +20,7 @@ The LLM proposes structured plans only. Android validates actions and executes l
 
 ## CI validation
 The workflow runs Kotlin core tests, Android unit tests, APK build, Node syntax/tests/web build, and Supabase function checks. A successful workflow proves CI build/test completion, not that every device/OEM interaction has been manually tested.
+
+
+## CI note
+The GitHub Actions workflow provisions Gradle 8.9 explicitly before generating the wrapper, so clean runners do not depend on a preinstalled Gradle executable.
