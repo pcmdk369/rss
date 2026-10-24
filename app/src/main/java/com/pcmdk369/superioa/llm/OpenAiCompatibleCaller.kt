@@ -1,5 +1,6 @@
 package com.pcmdk369.superioa.llm
 
+import com.pcmdk369.superioa.security.Redactor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
@@ -27,17 +28,16 @@ import kotlin.coroutines.resumeWithException
 
 /**
  * Adapter for providers that expose an OpenAI-style POST {baseUrl}/chat/completions.
- * Providers with a different wire format (e.g. native Anthropic or Gemini APIs) need their own
- * EngineCaller implementation; this class does not pretend all providers are compatible.
+ * Providers with a different wire format need their own EngineCaller implementation.
  */
 class OpenAiCompatibleCaller(private val http: OkHttpClient = OkHttpClient()) : EngineCaller {
 
     override suspend fun call(engine: EngineConfig, system: String, user: String): String {
         var base = engine.baseUrl.trim().trimEnd('/')
-        if (base.endsWith("/chat/completions")) {
+        if (base.endsWith("/chat/completions", ignoreCase = true)) {
             base = base.substringBeforeLast("/chat/completions").trimEnd('/')
         }
-        if (!base.startsWith("https://")) {
+        if (!base.startsWith("https://", ignoreCase = true)) {
             throw EngineError.Config("Engine ${engine.index}: base URL must start with https://")
         }
         val url = try {
@@ -48,6 +48,7 @@ class OpenAiCompatibleCaller(private val http: OkHttpClient = OkHttpClient()) : 
         val body = buildJsonObject {
             put("model", engine.modelId)
             put("temperature", 0)
+            put("stream", false)
             putJsonArray("messages") {
                 add(buildJsonObject { put("role", "system"); put("content", system) })
                 add(buildJsonObject { put("role", "user"); put("content", user) })
@@ -57,6 +58,7 @@ class OpenAiCompatibleCaller(private val http: OkHttpClient = OkHttpClient()) : 
         val req = Request.Builder()
             .url(url)
             .header("Authorization", "Bearer " + engine.apiKey)
+            .header("Accept", "application/json")
             .post(body.toRequestBody("application/json".toMediaType()))
             .build()
         val client = http.newBuilder()
@@ -70,15 +72,25 @@ class OpenAiCompatibleCaller(private val http: OkHttpClient = OkHttpClient()) : 
                 throw EngineError.Retryable("network error (${e.javaClass.simpleName})", e)
             }
             resp.use { r ->
-                val text = r.body?.string().orEmpty()
-                val code = r.code
+                val responseText = r.body?.string().orEmpty()
                 when {
-                    code in 200..299 -> parseContent(text)
-                    code == 408 || code == 429 || code >= 500 -> throw EngineError.Retryable("HTTP $code")
-                    else -> throw EngineError.Config("HTTP $code (check API key, model ID and base URL)")
+                    r.code in 200..299 -> parseContent(responseText)
+                    r.code == 408 || r.code == 429 || r.code >= 500 ->
+                        throw EngineError.Retryable(errorMessage(r.code, responseText, engine))
+                    else ->
+                        throw EngineError.Config(errorMessage(r.code, responseText, engine))
                 }
             }
         }
+    }
+
+    private fun errorMessage(code: Int, body: String, engine: EngineConfig): String {
+        // Keep provider diagnostics useful without leaking a key or an echoed credential.
+        val safeBody = Redactor.redact(body, listOf(engine.apiKey))
+            .replace(Regex("[\\r\\n\\t]+"), " ")
+            .take(220)
+        val detail = safeBody.takeIf { it.isNotBlank() }?.let { ": $it" }.orEmpty()
+        return "HTTP $code at ${engine.baseUrl.trimEnd('/')}/chat/completions$detail"
     }
 
     private fun parseContent(text: String): String {
