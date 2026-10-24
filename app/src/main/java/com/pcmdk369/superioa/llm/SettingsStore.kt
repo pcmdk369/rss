@@ -35,7 +35,12 @@ class SettingsStore(context: Context) {
             if (url.endsWith("/chat/completions", ignoreCase = true)) {
                 url = url.substringBeforeLast("/chat/completions").trimEnd('/')
             }
-            if (model.isBlank()) model = "meta/llama-3.3-nemotron-super-49b-v1.5"
+
+            // The hosted Super-49B endpoint was retired in August 2026. Migrate its old default.
+            if (model.isBlank() || model == "meta/llama-3.3-nemotron-super-49b-v1.5" ||
+                model == "nvidia/llama-3.3-nemotron-super-49b-v1.5") {
+                model = "nvidia/nemotron-3-nano-30b-a3b"
+            }
         }
 
         EngineConfig(
