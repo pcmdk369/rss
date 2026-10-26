@@ -33,7 +33,7 @@ Output: `app/build/outputs/apk/debug/app-debug.apk`.
 ```
 Home UI -> Orchestrator -> FailoverManager (engines 1..5, sequential) -> LLM returns JSON plan
         -> ActionValidator (strict schema) -> SecurityGate -> ActionEngine -> AccessibilityService
-        -> VERIFY / replan (max 8 rounds, 60 actions, 2 retries) -> Workflow memory (Room) + TTS
+        -> VERIFY / replan (max 5,000 rounds, 50,000 actions per task, 12 actions per plan, 2 retries per action) -> Workflow memory (Room) + TTS
 ```
 - Actions: OPEN_APP, BACK, HOME, RECENTS, TAP, TYPE, SCROLL, SWIPE, COPY, PASTE, READ_UI, WAIT, VERIFY, RETRY, ABORT, REQUEST_USER.
 - Failover happens only on planning calls (no side effects), so a timeout never repeats a tap or send.
