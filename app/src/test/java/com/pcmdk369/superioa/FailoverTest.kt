@@ -95,4 +95,19 @@ class FailoverTest {
         assertFalse(ex.message!!.contains("supersecretvalue123"))
         assertFalse(ex.attempts.any { it.error?.contains("supersecretvalue123") == true })
     }
+    @Test fun traceDrivenPriorityIsHonoredByFailoverManager() = runBlocking {
+        val seen = mutableListOf<Int>()
+        val engines = listOf(eng(1), eng(2))
+        val manager = FailoverManager(
+            engines = engines,
+            caller = { e, _, _ -> seen += e.index; "ok" },
+            maxRetriesPerEngine = 0,
+            delayFn = {},
+            enginePriority = listOf(2, 1),
+        )
+        val result = manager.complete("system", "user")
+        assertEquals(listOf(2), seen)
+        assertEquals(2, result.engineIndex)
+    }
+
 }
