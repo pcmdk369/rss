@@ -12,7 +12,7 @@ import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
 
 enum class ActionType {
-    OPEN_APP, BACK, HOME, RECENTS, TAP, LONG_PRESS, TYPE, CLEAR_TEXT, SCROLL, SWIPE,
+    OPEN_APP, BACK, HOME, RECENTS, NOTIFICATIONS, QUICK_SETTINGS, TAP, LONG_PRESS, TOGGLE, TYPE, CLEAR_TEXT, SELECT_ALL, SCROLL, SWIPE,
     COPY, PASTE, READ_UI, WAIT, VERIFY, RETRY, ABORT, REQUEST_USER
 }
 
@@ -44,7 +44,8 @@ data class AgentAction(
     /** Log-safe description: never includes typed text. */
     fun describe(): String = when (type) {
         ActionType.TYPE -> "TYPE(${text?.length ?: 0} chars)"
-        ActionType.TAP, ActionType.LONG_PRESS -> if (target != null) "TAP \"$target\"" else "TAP ($x,$y)"
+        ActionType.TAP, ActionType.LONG_PRESS -> if (target != null) "${type.name} \"$target\"" else "${type.name} ($x,$y)"
+        ActionType.TOGGLE -> "TOGGLE \"${target ?: "focused control"}\""
         ActionType.OPEN_APP -> "OPEN_APP ${target ?: ""}"
         ActionType.SCROLL -> "SCROLL $direction"
         ActionType.SWIPE -> "SWIPE ($x,$y)->($x2,$y2)"
@@ -163,7 +164,8 @@ object ActionValidator {
                 val t = a.text ?: ""
                 if (t.isNotEmpty() && t.length <= MAX_TEXT) V.Ok(a) else V.Bad("TYPE needs 'text' (1..$MAX_TEXT chars)")
             }
-            ActionType.CLEAR_TEXT -> V.Ok(a)
+            ActionType.CLEAR_TEXT, ActionType.SELECT_ALL -> V.Ok(a)
+            ActionType.TOGGLE -> if (!a.target.isNullOrBlank() && a.target.length <= MAX_TARGET) V.Ok(a) else V.Bad("TOGGLE needs a target text or view id")
             ActionType.SCROLL ->
                 if (a.direction in DIRECTIONS) V.Ok(a) else V.Bad("SCROLL direction must be up/down/left/right")
             ActionType.SWIPE ->
@@ -176,7 +178,8 @@ object ActionValidator {
                 val t = a.target ?: a.text ?: ""
                 if (t.isNotEmpty() && t.length <= MAX_TARGET) V.Ok(a) else V.Bad("VERIFY needs 'target' or 'text'")
             }
-            ActionType.BACK, ActionType.HOME, ActionType.RECENTS, ActionType.COPY,
+            ActionType.BACK, ActionType.HOME, ActionType.RECENTS, ActionType.NOTIFICATIONS,
+            ActionType.QUICK_SETTINGS, ActionType.COPY,
             ActionType.PASTE, ActionType.READ_UI, ActionType.RETRY,
             ActionType.ABORT, ActionType.REQUEST_USER -> V.Ok(a)
         }
