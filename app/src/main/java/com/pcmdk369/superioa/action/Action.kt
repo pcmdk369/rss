@@ -12,7 +12,7 @@ import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
 
 enum class ActionType {
-    OPEN_APP, BACK, HOME, RECENTS, TAP, TYPE, SCROLL, SWIPE,
+    OPEN_APP, BACK, HOME, RECENTS, TAP, LONG_PRESS, TYPE, CLEAR_TEXT, SCROLL, SWIPE,
     COPY, PASTE, READ_UI, WAIT, VERIFY, RETRY, ABORT, REQUEST_USER
 }
 
@@ -44,7 +44,7 @@ data class AgentAction(
     /** Log-safe description: never includes typed text. */
     fun describe(): String = when (type) {
         ActionType.TYPE -> "TYPE(${text?.length ?: 0} chars)"
-        ActionType.TAP -> if (target != null) "TAP \"$target\"" else "TAP ($x,$y)"
+        ActionType.TAP, ActionType.LONG_PRESS -> if (target != null) "TAP \"$target\"" else "TAP ($x,$y)"
         ActionType.OPEN_APP -> "OPEN_APP ${target ?: ""}"
         ActionType.SCROLL -> "SCROLL $direction"
         ActionType.SWIPE -> "SWIPE ($x,$y)->($x2,$y2)"
