@@ -57,9 +57,11 @@ class Orchestrator(
     private val onSpeak: (String) -> Unit = {},
 ) {
     companion object {
-        const val MAX_ROUNDS = 8
-        const val MAX_ACTIONS = 60
+        const val MAX_ROUNDS = 5_000
+        const val MAX_ACTIONS = 50_000
         const val MAX_RETRIES = 2
+        // Keep replayable Room workflows compact; large tasks execute but are not persisted as one JSON blob.
+        const val MAX_SAVED_WORKFLOW_ACTIONS = 500
     }
 
     private class RunFlags {
@@ -198,7 +200,11 @@ class Orchestrator(
                 outcome = TaskStatus.DONE
                 summary = "Task finished."
                 if (!flags.sensitive && !replayFailed && executed.isNotEmpty()) {
-                    recordOutcome(saved, key, true, executed, startPkg)
+                    if (executed.size <= MAX_SAVED_WORKFLOW_ACTIONS) {
+                        recordOutcome(saved, key, true, executed, startPkg)
+                    } else {
+                        log("Large workflow (" + executed.size + " actions) completed; replay snapshot skipped to keep local storage bounded.")
+                    }
                 }
             } else {
                 summary = "Stopped after $MAX_ROUNDS rounds without a verified result."
