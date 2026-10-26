@@ -5,7 +5,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
-import androidx.activity.ComponentActivity
+import androidx.fragment.app.FragmentActivity
 import androidx.activity.compose.setContent
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
@@ -31,7 +31,7 @@ import androidx.core.content.ContextCompat.getMainExecutor
 import com.pcmdk369.superioa.voice.AdminVoiceAuth
 import com.pcmdk369.superioa.voice.AdminVoiceService
 
-class AdminVoiceActivity : ComponentActivity() {
+class AdminVoiceActivity : FragmentActivity() {
     private var afterAuthentication: (() -> Unit)? = null
     private var statusSetter: ((String) -> Unit)? = null
 
