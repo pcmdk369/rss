@@ -40,6 +40,18 @@ class ActionEngine(private val ctx: Context) {
                 else svc.tapAt(a.x ?: 0, a.y ?: 0)
                 if (ok) ExecResult.Ok else ExecResult.Failed("could not tap ${t ?: "(${a.x},${a.y})"}")
             }
+            ActionType.LONG_PRESS -> {
+                val t = a.target
+                val ok = if (!t.isNullOrEmpty()) svc.longPressNode(t)
+                else svc.longPressAt(a.x ?: 0, a.y ?: 0)
+                if (ok) ExecResult.Ok else ExecResult.Failed("could not long-press ${t ?: "(${a.x},${a.y})"}")
+            }
+            ActionType.CLEAR_TEXT -> when (svc.clearText()) {
+                TypeResult.OK -> ExecResult.Ok
+                TypeResult.PASSWORD_FIELD -> ExecResult.NeedUser("A password field is focused. Please clear it yourself.")
+                TypeResult.NO_FIELD -> ExecResult.Failed("no input field available")
+                TypeResult.FAILED -> ExecResult.Failed("clearing text failed")
+            }
             ActionType.TYPE -> when (svc.typeText(a.text ?: "")) {
                 TypeResult.OK -> ExecResult.Ok
                 TypeResult.PASSWORD_FIELD -> ExecResult.NeedUser("A password field is focused. Please type it yourself.")
