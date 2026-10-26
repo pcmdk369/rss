@@ -4,7 +4,7 @@ Android task-orchestration assistant by PCMDK369: an LLM **plans** (strict JSON 
 
 Kotlin + Jetpack Compose, Room, EncryptedSharedPreferences, OkHttp. minSdk 26, target 34.
 
-> Status: source written and statically reviewed only. It has **not** been compiled or run on a device by the author's tooling. See `CHECKLIST.md`.
+> Build status: this source tree has not yet been compiled or run on a device in this workflow. The OpenJarvis-inspired Android-native primitives are being developed on the draft integration PR; do not treat them as production-verified until CI and device tests pass. See `CHECKLIST.md`.
 
 ## Get the APK (no Android Studio needed)
 1. Create a GitHub repository and push this folder to the `main` branch.
@@ -36,6 +36,19 @@ Output: `app/build/outputs/apk/debug/app-debug.apk`.
 - A partial wake lock keeps the CPU available while the service is active and can increase battery use.
 - **Limits:** Android may stop the service, the user can force-stop the app, reboot requires a fresh manual authentication/start, and recognition availability/network depends on the configured Android speech service. This is not a guaranteed 24/7 SLA.
 - A spoken passphrase can be recorded/replayed and is not voice biometrics. Keep the phone secured; do not use a banking PIN, account password, or other existing secret as the phrase. Audio may be processed by Android's configured speech-recognition provider. Sensitive tasks still require the app's approval/security flow.
+
+## OpenJarvis-inspired Android architecture
+
+SuperiOA adapts ideas from [OpenJarvis](https://github.com/open-jarvis/OpenJarvis) to Android instead of copying its Python/Rust/desktop source tree into the APK.
+
+- **Model catalog:** reports configured model IDs and endpoint metadata; it does not claim an unconfigured or unreachable model is available.
+- **Pluggable engine adapters:** `EngineAdapterRegistry` allows protocol adapters to be registered. The current default is OpenAI-compatible chat completions.
+- **Pluggable agent profiles and skills:** profiles add planning guidance; registered skills supply contextual instructions. They never execute device actions directly.
+- **Trace-driven routing:** recent local Room task outcomes influence the order of configured LLM engines. If no history exists, routing falls back to engine-number order.
+- **Local trace analysis:** task history can be summarized by outcome, engines used, and average duration.
+- **Security boundary:** all Android actions still pass through the existing strict action validator, security gate, and Accessibility executor.
+
+This Android port does **not** yet provide a bundled on-device LLM, embeddings/vector document store, arbitrary code execution sandbox, streaming generation, or a full OpenJarvis desktop/server stack. A loopback endpoint is only a local-compatible server endpoint; it is not proof that a model is running directly on the phone. See [the integration plan](docs/OPENJARVIS_INTEGRATION.md).
 
 ## Architecture
 ```
