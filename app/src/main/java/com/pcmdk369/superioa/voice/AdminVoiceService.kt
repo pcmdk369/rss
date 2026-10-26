@@ -45,6 +45,7 @@ class AdminVoiceService : Service() {
     private var recognizer: SpeechRecognizer? = null
     private var listening = false
     private var taskRunning = false
+    @Volatile private var destroyed = false
     private lateinit var settings: SettingsStore
     private lateinit var db: AppDb
     private lateinit var speaker: Speaker
@@ -88,7 +89,7 @@ class AdminVoiceService : Service() {
     }
 
     private fun startListening() {
-        if (listening || taskRunning || isDestroyed) return
+        if (listening || taskRunning || destroyed) return
         if (checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
             speaker.speak("Microphone permission is required. Open SuperiOA voice settings.")
             stopSelf()
@@ -164,7 +165,7 @@ class AdminVoiceService : Service() {
     }
 
     private fun scheduleListenRetry() {
-        if (isDestroyed || taskRunning) return
+        if (destroyed || taskRunning) return
         scope.launch {
             delay(700)
             startListening()
@@ -218,6 +219,7 @@ class AdminVoiceService : Service() {
     }
 
     override fun onDestroy() {
+        destroyed = true
         stopListening()
         scope.cancel()
         speaker.shutdown()
