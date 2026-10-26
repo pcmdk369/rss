@@ -51,13 +51,14 @@ object AdminVoiceAuth {
         val p = prefs(context)
         val salt = p.getString(SALT_KEY, null)?.fromHex() ?: return null
         val expected = p.getString(HASH_KEY, null)?.fromHex() ?: return null
-        val normalized = normalize(utterance)
-        val words = normalized.split(" ")
-        // Try each prefix so ASR punctuation and spoken command boundaries are tolerated.
-        for (count in 2 until words.size) {
-            val phrase = words.take(count).joinToString(" ")
+        val rawWords = utterance.trim().split(Regex("\\s+")).filter { it.isNotBlank() }
+        // Match the normalized prefix, but preserve the recognized command's original casing.
+        for (count in 2 until rawWords.size) {
+            val phrase = normalize(rawWords.take(count).joinToString(" "))
             if (MessageDigest.isEqual(hash(phrase, salt), expected)) {
-                return words.drop(count).joinToString(" ").trim()
+                return rawWords.drop(count).joinToString(" ").trim()
+                    .trimStart(',', ':', ';')
+                    .trim()
                     .takeIf { it.length >= 2 }
             }
         }
@@ -86,8 +87,12 @@ object AdminVoiceAuth {
     }
 
     private fun ByteArray.toHex() = joinToString("") { "%02x".format(it) }
-    private fun String.fromHex(): ByteArray? = try {
+    private fun String.fromHex(): ByteArray? {
         if (length % 2 != 0) return null
-        chunked(2).map { it.toInt(16).toByte() }.toByteArray()
-    } catch (_: Exception) { null }
+        return try {
+            chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+        } catch (_: Exception) {
+            null
+        }
+    }
 }
