@@ -18,7 +18,7 @@ data class ModelSpec(
     val provider: String,
     val protocol: String,
     val configuredEngineIndex: Int,
-    val localInference: Boolean = false,
+    val loopbackEndpoint: Boolean = false,
     val contextLength: Int? = null,
     val capabilities: Set<String> = emptySet(),
 )
@@ -34,7 +34,7 @@ object ModelCatalog {
                     provider = providerName(engine.baseUrl),
                     protocol = "openai-compatible-chat-completions",
                     configuredEngineIndex = engine.index,
-                    localInference = isLoopback(engine.baseUrl),
+                    loopbackEndpoint = isLoopback(engine.baseUrl),
                 )
             }
 
