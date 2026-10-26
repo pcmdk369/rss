@@ -95,6 +95,33 @@ class SuperiAccessibilityService : AccessibilityService() {
         return if (node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)) TypeResult.OK else TypeResult.FAILED
     }
 
+    fun clearText(): TypeResult {
+        val root = rootInActiveWindow ?: return TypeResult.NO_FIELD
+        val node = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT) ?: firstEditable(root) ?: return TypeResult.NO_FIELD
+        if (node.isPassword) return TypeResult.PASSWORD_FIELD
+        val args = Bundle().apply {
+            putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, "")
+        }
+        return if (node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)) TypeResult.OK else TypeResult.FAILED
+    }
+
+    fun longPressNode(query: String): Boolean {
+        val node = findNode(query) ?: return false
+        val bounds = Rect()
+        node.getBoundsInScreen(bounds)
+        return dispatchLongPress(bounds.centerX(), bounds.centerY())
+    }
+
+    suspend fun longPressAt(x: Int, y: Int): Boolean = gesture(x, y, x, y, 800)
+
+    private fun dispatchLongPress(x: Int, y: Int): Boolean {
+        val path = Path().apply { moveTo(x.toFloat(), y.toFloat()) }
+        val gesture = GestureDescription.Builder()
+            .addStroke(GestureDescription.StrokeDescription(path, 0, 800))
+            .build()
+        return dispatchGesture(gesture, null, null)
+    }
+
     private fun firstEditable(n: AccessibilityNodeInfo?): AccessibilityNodeInfo? {
         if (n == null) return null
         if (n.isEditable && n.isVisibleToUser) return n
