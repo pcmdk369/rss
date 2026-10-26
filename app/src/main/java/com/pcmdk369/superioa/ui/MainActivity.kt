@@ -7,6 +7,7 @@ import android.content.Intent
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.Text
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.ui.Alignment
@@ -23,8 +24,9 @@ class MainActivity : ComponentActivity() {
                     ExtendedFloatingActionButton(
                         onClick = { startActivity(Intent(this@MainActivity, AdminVoiceActivity::class.java)) },
                         modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
-                        text = { androidx.compose.material3.Text("Admin Voice Mode") }
-                    )
+                         ) {
+                        Text("Admin Voice Mode")
+                    }
                 }
             }
         }
