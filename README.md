@@ -35,7 +35,7 @@ Home UI -> Orchestrator -> FailoverManager (engines 1..5, sequential) -> LLM ret
         -> ActionValidator (strict schema) -> SecurityGate -> ActionEngine -> AccessibilityService
         -> VERIFY / replan (max 5,000 rounds, 50,000 actions per task, 12 actions per plan, 2 retries per action) -> Workflow memory (Room) + TTS
 ```
-- Actions: OPEN_APP, BACK, HOME, RECENTS, TAP, TYPE, SCROLL, SWIPE, COPY, PASTE, READ_UI, WAIT, VERIFY, RETRY, ABORT, REQUEST_USER.
+- Actions: OPEN_APP, BACK, HOME, RECENTS, TAP, LONG_PRESS, TYPE, CLEAR_TEXT, SCROLL, SWIPE, COPY, PASTE, READ_UI, WAIT, VERIFY, RETRY, ABORT, REQUEST_USER.
 - Failover happens only on planning calls (no side effects), so a timeout never repeats a tap or send.
 - Workflows are saved only after a verified success with no security checkpoint, reused only when the app context matches and confidence >= 0.70 (0.40-0.70 asks first).
 
