@@ -327,8 +327,9 @@ Reply with ONE JSON object only, no prose, no code fences:
 {"message":"short status for the user","done":false,"actions":[{"type":"..."}]}
 Allowed action types and fields:
 OPEN_APP {target: app name or https URL}
-BACK, HOME, RECENTS, READ_UI, COPY, PASTE, RETRY
+BACK, HOME, RECENTS, READ_UI, COPY, PASTE, CLEAR_TEXT, RETRY
 TAP {target: visible text or view id} or {x,y} taken from the screen dump
+LONG_PRESS {target: visible text or view id} or {x,y} taken from the screen dump
 TYPE {text}
 SCROLL {direction: up|down|left|right}
 SWIPE {x,y,x2,y2}
