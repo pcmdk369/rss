@@ -151,7 +151,7 @@ object ActionValidator {
                     else -> V.Ok(a)
                 }
             }
-            ActionType.TAP -> {
+            ActionType.TAP, ActionType.LONG_PRESS -> {
                 val t = a.target ?: ""
                 when {
                     t.isNotEmpty() && t.length <= MAX_TARGET -> V.Ok(a)
@@ -163,6 +163,7 @@ object ActionValidator {
                 val t = a.text ?: ""
                 if (t.isNotEmpty() && t.length <= MAX_TEXT) V.Ok(a) else V.Bad("TYPE needs 'text' (1..$MAX_TEXT chars)")
             }
+            ActionType.CLEAR_TEXT -> V.Ok(a)
             ActionType.SCROLL ->
                 if (a.direction in DIRECTIONS) V.Ok(a) else V.Bad("SCROLL direction must be up/down/left/right")
             ActionType.SWIPE ->
