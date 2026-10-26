@@ -101,6 +101,25 @@ class SuperiAccessibilityService : AccessibilityService() {
         return if (node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)) TypeResult.OK else TypeResult.FAILED
     }
 
+    fun selectAllFocused(): TypeResult {
+        val root = rootInActiveWindow ?: return TypeResult.NO_FIELD
+        val node = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT) ?: firstEditable(root) ?: return TypeResult.NO_FIELD
+        if (node.isPassword) return TypeResult.PASSWORD_FIELD
+        val length = node.text?.length ?: 0
+        if (length == 0) return TypeResult.OK
+        val args = Bundle().apply {
+            putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_START_INT, 0)
+            putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_END_INT, length)
+        }
+        return if (node.performAction(AccessibilityNodeInfo.ACTION_SET_SELECTION, args)) TypeResult.OK else TypeResult.FAILED
+    }
+
+    fun toggleNode(query: String): Boolean {
+        val node = findNode(query) ?: return false
+        if (!node.isEnabled) return false
+        return node.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+    }
+
     fun clearText(): TypeResult {
         val root = rootInActiveWindow ?: return TypeResult.NO_FIELD
         val node = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT) ?: firstEditable(root) ?: return TypeResult.NO_FIELD
@@ -111,22 +130,15 @@ class SuperiAccessibilityService : AccessibilityService() {
         return if (node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)) TypeResult.OK else TypeResult.FAILED
     }
 
-    fun longPressNode(query: String): Boolean {
+    suspend fun longPressNode(query: String): Boolean {
         val node = findNode(query) ?: return false
         val bounds = Rect()
         node.getBoundsInScreen(bounds)
-        return dispatchLongPress(bounds.centerX(), bounds.centerY())
+        return gesture(bounds.centerX(), bounds.centerY(), bounds.centerX(), bounds.centerY(), 800)
     }
 
     suspend fun longPressAt(x: Int, y: Int): Boolean = gesture(x, y, x, y, 800)
 
-    private fun dispatchLongPress(x: Int, y: Int): Boolean {
-        val path = Path().apply { moveTo(x.toFloat(), y.toFloat()) }
-        val gesture = GestureDescription.Builder()
-            .addStroke(GestureDescription.StrokeDescription(path, 0, 800))
-            .build()
-        return dispatchGesture(gesture, null, null)
-    }
 
     private fun firstEditable(n: AccessibilityNodeInfo?): AccessibilityNodeInfo? {
         if (n == null) return null
