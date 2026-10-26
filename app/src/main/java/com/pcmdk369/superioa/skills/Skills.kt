@@ -47,7 +47,7 @@ object SkillRegistry {
         val matches = synchronized(this) {
             skills.values.filter { skill -> runCatching { skill.matches(goal) }.getOrDefault(false) }
         }
-        return matches.joinToString("\\n") { "- [${it.id}] ${it.hints}" }
+        return matches.joinToString("\n") { "- [${it.id}] ${it.hints}" }
             .ifBlank { "- No specific skill matched; use generic UI actions." }
     }
 }
