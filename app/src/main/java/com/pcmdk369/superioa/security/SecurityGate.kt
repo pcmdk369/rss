@@ -26,9 +26,9 @@ object SecurityGate {
 
     /** Returns a reason when an action is high-impact and needs explicit approval first. */
     fun actionNeedsApproval(a: AgentAction): String? {
-        if (a.type != ActionType.TAP) return null
+        if (a.type !in setOf(ActionType.TAP, ActionType.LONG_PRESS, ActionType.TOGGLE)) return null
         val t = a.target ?: return null
         val m = actionTrigger.find(t) ?: return null
-        return "High-impact action: tap \"${t.take(60)}\" (${m.value.lowercase()}). Allow?"
+        return "High-impact action: ${a.type.name.lowercase()} \"${t.take(60)}\" (${m.value.lowercase()}). Allow?"
     }
 }
