@@ -58,9 +58,7 @@ class AdminVoiceService : Service() {
         settings = SettingsStore(applicationContext)
         db = Room.databaseBuilder(applicationContext, AppDb::class.java, "superioa.db").build()
         speaker = Speaker(applicationContext)
-        orchestrator = Orchestrator(applicationContext, settings, db) { text ->
-            if (settings.ttsEnabled) speaker.speak(text)
-        }
+        orchestrator = Orchestrator(applicationContext, settings, db)
         createChannel()
     }
 
