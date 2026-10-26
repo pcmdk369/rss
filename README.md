@@ -29,6 +29,14 @@ Output: `app/build/outputs/apk/debug/app-debug.apk`.
 2. **Settings > LLM engines**: enable at least one engine and fill in key, `https://` base URL and model ID (OpenAI-style `/chat/completions`). Engines 2-5 are fallbacks tried in order.
 3. **Home**: type or dictate a task, press **Run**. **Stop** cancels immediately. Approval dialogs appear for CAPTCHA/OTP/password/payment screens and high-impact UI controls.
 
+## Admin-only background voice mode
+- Main screen includes **Admin Voice Mode**. Enroll a private multi-word passphrase after Android device authentication; the passphrase hash is stored in Keystore-backed encrypted preferences.
+- To start listening, grant microphone and notification permissions and authenticate with Android biometric/device credential. The app starts a microphone foreground service with an ongoing notification and an explicit Stop action.
+- Each spoken instruction must begin with the enrolled passphrase; the service strips the passphrase before passing the command to the existing Orchestrator. The result is spoken through Android TTS.
+- A partial wake lock keeps the CPU available while the service is active and can increase battery use.
+- **Limits:** Android may stop the service, the user can force-stop the app, reboot requires a fresh manual authentication/start, and recognition availability/network depends on the configured Android speech service. This is not a guaranteed 24/7 SLA.
+- A spoken passphrase can be recorded/replayed and is not voice biometrics. Keep the phone secured; do not use a banking PIN, account password, or other existing secret as the phrase. Audio may be processed by Android's configured speech-recognition provider. Sensitive tasks still require the app's approval/security flow.
+
 ## Architecture
 ```
 Home UI -> Orchestrator -> FailoverManager (engines 1..5, sequential) -> LLM returns JSON plan
