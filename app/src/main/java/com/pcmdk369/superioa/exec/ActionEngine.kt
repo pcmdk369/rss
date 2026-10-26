@@ -34,6 +34,8 @@ class ActionEngine(private val ctx: Context) {
             ActionType.BACK -> global(svc, AccessibilityService.GLOBAL_ACTION_BACK)
             ActionType.HOME -> global(svc, AccessibilityService.GLOBAL_ACTION_HOME)
             ActionType.RECENTS -> global(svc, AccessibilityService.GLOBAL_ACTION_RECENTS)
+            ActionType.NOTIFICATIONS -> global(svc, AccessibilityService.GLOBAL_ACTION_NOTIFICATIONS)
+            ActionType.QUICK_SETTINGS -> global(svc, AccessibilityService.GLOBAL_ACTION_QUICK_SETTINGS)
             ActionType.TAP -> {
                 val t = a.target
                 val ok = if (t != null && t.isNotEmpty()) svc.tapNode(t)
@@ -45,6 +47,13 @@ class ActionEngine(private val ctx: Context) {
                 val ok = if (!t.isNullOrEmpty()) svc.longPressNode(t)
                 else svc.longPressAt(a.x ?: 0, a.y ?: 0)
                 if (ok) ExecResult.Ok else ExecResult.Failed("could not long-press ${t ?: "(${a.x},${a.y})"}")
+            }
+            ActionType.TOGGLE -> if (svc.toggleNode(a.target ?: "")) ExecResult.Ok else ExecResult.Failed("could not toggle ${a.target}")
+            ActionType.SELECT_ALL -> when (svc.selectAllFocused()) {
+                TypeResult.OK -> ExecResult.Ok
+                TypeResult.PASSWORD_FIELD -> ExecResult.NeedUser("A password field is focused. Please select text yourself.")
+                TypeResult.NO_FIELD -> ExecResult.Failed("no input field available")
+                TypeResult.FAILED -> ExecResult.Failed("select all failed")
             }
             ActionType.CLEAR_TEXT -> when (svc.clearText()) {
                 TypeResult.OK -> ExecResult.Ok
