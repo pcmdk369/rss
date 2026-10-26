@@ -9,7 +9,7 @@ Legend: **Implemented** = code written; **Untested** = not compiled or run in th
 | 2 | Shared OpenAI-compatible adapter; other wire formats need their own `EngineCaller` | Implemented (one adapter only) | `llm/OpenAiCompatibleCaller.kt` |
 | 2 | Record which engine succeeded and why earlier ones failed | Implemented | `LlmResult.attempts`, shown in task log |
 | 5 | Android AccessibilityService | Implemented, untested on device | `exec/SuperiAccessibilityService.kt` |
-| 6 | Universal Action Engine, 16 actions, strict schema validation | Implemented, unit tests written | `action/Action.kt`, `exec/ActionEngine.kt` |
+| 6 | Universal Action Engine, 16 actions, strict schema validation | Implemented, unit tests written; bounded task ceiling raised to 50,000 actions across up to 5,000 planning rounds, with 12 actions per model reply | `action/Action.kt`, `exec/ActionEngine.kt`, `orchestrator/Orchestrator.kt` |
 | 7 | Master agent / Task Orchestrator, verification, replanning | Implemented, untested | `orchestrator/Orchestrator.kt` |
 | 8 | Local workflow memory (version, context, confidence, last-used, clear) | Implemented, unit tests for confidence | `memory/*`, Settings screen |
 | 3 | TTS (Android native) | Implemented | `voice/Speaker.kt` |
