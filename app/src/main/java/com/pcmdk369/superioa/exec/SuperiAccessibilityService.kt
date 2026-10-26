@@ -59,7 +59,13 @@ class SuperiAccessibilityService : AccessibilityService() {
                     n.getBoundsInScreen(r)
                     sb.append(label.take(80)).append(" @(").append(r.centerX()).append(',').append(r.centerY()).append(')')
                     if (n.isClickable) sb.append(" [click]")
+                    if (n.isLongClickable) sb.append(" [long-click]")
                     if (n.isEditable) sb.append(" [input]")
+                    if (n.isScrollable) sb.append(" [scroll]")
+                    if (n.isCheckable) sb.append(if (n.isChecked) " [checked]" else " [checkable]")
+                    if (!n.isEnabled) sb.append(" [disabled]")
+                    if (n.isSelected) sb.append(" [selected]")
+                    n.viewIdResourceName?.let { sb.append(" [id=").append(it.take(120)).append(']') }
                     sb.append('\n')
                     count++
                 }
