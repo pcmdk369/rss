@@ -46,6 +46,11 @@ class ActionValidatorTest {
     @Test fun longPressByTargetAccepted() { valid("""{"actions":[{"type":"LONG_PRESS","target":"More options"}]}""") }
     @Test fun longPressByCoordinatesAccepted() { valid("""{"actions":[{"type":"LONG_PRESS","x":100,"y":200}]}""") }
     @Test fun clearTextAccepted() { valid("""{"actions":[{"type":"CLEAR_TEXT"}]}""") }
+    @Test fun selectAllAccepted() { valid("""{"actions":[{"type":"SELECT_ALL"}]}""") }
+    @Test fun toggleNeedsTarget() = invalid("""{"actions":[{"type":"TOGGLE"}]}""")
+    @Test fun toggleByTargetAccepted() { valid("""{"actions":[{"type":"TOGGLE","target":"Wi-Fi"}]}""") }
+    @Test fun notificationShadeAccepted() { valid("""{"actions":[{"type":"NOTIFICATIONS"}]}""") }
+    @Test fun quickSettingsAccepted() { valid("""{"actions":[{"type":"QUICK_SETTINGS"}]}""") }
     @Test fun waitTooLongRejected() = invalid("""{"actions":[{"type":"WAIT","millis":60000}]}""")
     @Test fun waitZeroRejected() = invalid("""{"actions":[{"type":"WAIT","millis":0}]}""")
     @Test fun typeTooLongRejected() = invalid("""{"actions":[{"type":"TYPE","text":"${"a".repeat(501)}"}]}""")
