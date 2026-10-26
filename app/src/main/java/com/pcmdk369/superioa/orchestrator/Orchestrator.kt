@@ -8,10 +8,12 @@ import com.pcmdk369.superioa.action.PlanResult
 import com.pcmdk369.superioa.exec.ActionEngine
 import com.pcmdk369.superioa.exec.ExecResult
 import com.pcmdk369.superioa.exec.SuperiAccessibilityService
+import com.pcmdk369.superioa.framework.AgentProfileRegistry
+import com.pcmdk369.superioa.framework.EngineAdapterRegistry
+import com.pcmdk369.superioa.framework.TraceDrivenRouter
 import com.pcmdk369.superioa.llm.AllEnginesFailedException
 import com.pcmdk369.superioa.llm.EngineCaller
 import com.pcmdk369.superioa.llm.FailoverManager
-import com.pcmdk369.superioa.llm.OpenAiCompatibleCaller
 import com.pcmdk369.superioa.llm.SecurityDenied
 import com.pcmdk369.superioa.llm.SettingsStore
 import com.pcmdk369.superioa.memory.AppDb
@@ -31,6 +33,7 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonArray
 
@@ -53,7 +56,7 @@ class Orchestrator(
     private val ctx: Context,
     private val settings: SettingsStore,
     private val db: AppDb,
-    private val caller: EngineCaller = OpenAiCompatibleCaller(),
+    private val caller: EngineCaller = EngineAdapterRegistry.create("openai-compatible"),
     private val onSpeak: (String) -> Unit = {},
 ) {
     companion object {
@@ -154,7 +157,11 @@ class Orchestrator(
             }
 
             // 2) Plan -> validate -> gate -> execute -> verify, in bounded rounds.
-            val failover = FailoverManager(settings.loadEngines(), caller)
+            val configuredEngines = settings.loadEngines()
+            // Learn routing preferences from local task traces; keep numeric order as a deterministic fallback.
+            val recentTraces = runCatching { db.logs().recent().first() }.getOrDefault(emptyList())
+            val enginePriority = TraceDrivenRouter.rankEngines(configuredEngines, recentTraces)
+            val failover = FailoverManager(configuredEngines, caller, enginePriority = enginePriority)
             val history = mutableListOf<String>()
             var finished = false
             var round = 0
@@ -169,7 +176,7 @@ class Orchestrator(
                 }
                 setStatus(TaskStatus.PLANNING)
                 val res = failover.complete(
-                    Prompts.system(SkillRegistry.hintsFor(goal)),
+                    Prompts.system(SkillRegistry.hintsFor(goal) + "\n- [agent-profile:${AgentProfileRegistry.resolve(goal).id}] " + AgentProfileRegistry.resolve(goal).systemGuidance),
                     Prompts.user(goal, Redactor.redact(screen), history.takeLast(6))
                 )
                 engineUsed = res.engineIndex
