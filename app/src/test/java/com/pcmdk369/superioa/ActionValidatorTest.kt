@@ -43,6 +43,9 @@ class ActionValidatorTest {
     @Test fun tapOutOfBoundsRejected() = invalid("""{"actions":[{"type":"TAP","x":5000,"y":10}]}""")
     @Test fun tapNeedsTargetOrCoords() = invalid("""{"actions":[{"type":"TAP"}]}""")
     @Test fun tapCoordsInBoundsAccepted() { valid("""{"actions":[{"type":"TAP","x":100,"y":200}]}""") }
+    @Test fun longPressByTargetAccepted() { valid("""{"actions":[{"type":"LONG_PRESS","target":"More options"}]}""") }
+    @Test fun longPressByCoordinatesAccepted() { valid("""{"actions":[{"type":"LONG_PRESS","x":100,"y":200}]}""") }
+    @Test fun clearTextAccepted() { valid("""{"actions":[{"type":"CLEAR_TEXT"}]}""") }
     @Test fun waitTooLongRejected() = invalid("""{"actions":[{"type":"WAIT","millis":60000}]}""")
     @Test fun waitZeroRejected() = invalid("""{"actions":[{"type":"WAIT","millis":0}]}""")
     @Test fun typeTooLongRejected() = invalid("""{"actions":[{"type":"TYPE","text":"${"a".repeat(501)}"}]}""")
