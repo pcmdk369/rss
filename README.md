@@ -27,7 +27,7 @@ Output: `app/build/outputs/apk/debug/app-debug.apk`.
 ## First run
 1. Open the app, read the disclosure, tap **Open Accessibility settings**, enable **SuperiOA**.
 2. **Settings > LLM engines**: enable at least one engine and fill in key, `https://` base URL and model ID (OpenAI-style `/chat/completions`). Engines 2-5 are fallbacks tried in order.
-3. **Home**: type or dictate a task, press **Run**. **Stop** cancels immediately. Approval dialogs appear for CAPTCHA/OTP/password/payment screens and high-impact taps.
+3. **Home**: type or dictate a task, press **Run**. **Stop** cancels immediately. Approval dialogs appear for CAPTCHA/OTP/password/payment screens and high-impact UI controls.
 
 ## Architecture
 ```
@@ -35,7 +35,7 @@ Home UI -> Orchestrator -> FailoverManager (engines 1..5, sequential) -> LLM ret
         -> ActionValidator (strict schema) -> SecurityGate -> ActionEngine -> AccessibilityService
         -> VERIFY / replan (max 5,000 rounds, 50,000 actions per task, 12 actions per plan, 2 retries per action) -> Workflow memory (Room) + TTS
 ```
-- Actions: OPEN_APP, BACK, HOME, RECENTS, TAP, LONG_PRESS, TYPE, CLEAR_TEXT, SCROLL, SWIPE, COPY, PASTE, READ_UI, WAIT, VERIFY, RETRY, ABORT, REQUEST_USER.
+- Actions: OPEN_APP, BACK, HOME, RECENTS, NOTIFICATIONS, QUICK_SETTINGS, TAP, LONG_PRESS, TOGGLE, TYPE, CLEAR_TEXT, SELECT_ALL, SCROLL, SWIPE, COPY, PASTE, READ_UI, WAIT, VERIFY, RETRY, ABORT, REQUEST_USER.
 - Failover happens only on planning calls (no side effects), so a timeout never repeats a tap or send.
 - Workflows are saved only after a verified success with no security checkpoint, reused only when the app context matches and confidence >= 0.70 (0.40-0.70 asks first).
 
