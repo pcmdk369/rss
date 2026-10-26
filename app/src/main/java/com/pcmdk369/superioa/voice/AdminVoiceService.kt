@@ -8,6 +8,7 @@ import android.app.Service
 import android.content.Intent
 import android.os.Build
 import android.os.IBinder
+import android.os.PowerManager
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
@@ -46,6 +47,7 @@ class AdminVoiceService : Service() {
     private var listening = false
     private var taskRunning = false
     @Volatile private var destroyed = false
+    private var wakeLock: PowerManager.WakeLock? = null
     private lateinit var settings: SettingsStore
     private lateinit var db: AppDb
     private lateinit var speaker: Speaker
@@ -66,6 +68,7 @@ class AdminVoiceService : Service() {
         when (intent?.action) {
             ACTION_STOP -> {
                 stopListening()
+                releaseWakeLock()
                 stopForeground(STOP_FOREGROUND_REMOVE)
                 stopSelf()
                 return START_NOT_STICKY
@@ -78,6 +81,7 @@ class AdminVoiceService : Service() {
                     return START_NOT_STICKY
                 }
                 startForeground(NOTIFICATION_ID, buildNotification())
+                acquireWakeLock()
                 startListening()
                 return START_NOT_STICKY
             }
@@ -85,6 +89,24 @@ class AdminVoiceService : Service() {
                 stopSelf()
                 return START_NOT_STICKY
             }
+        }
+    }
+
+    private fun acquireWakeLock() {
+        if (wakeLock?.isHeld == true) return
+        val power = getSystemService(POWER_SERVICE) as PowerManager
+        wakeLock = power.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "$packageName:AdminVoice").apply {
+            setReferenceCounted(false)
+            acquire()
+        }
+    }
+
+    private fun releaseWakeLock() {
+        try {
+            if (wakeLock?.isHeld == true) wakeLock?.release()
+        } catch (_: Exception) {
+        } finally {
+            wakeLock = null
         }
     }
 
@@ -221,6 +243,7 @@ class AdminVoiceService : Service() {
     override fun onDestroy() {
         destroyed = true
         stopListening()
+        releaseWakeLock()
         scope.cancel()
         speaker.shutdown()
         db.close()
