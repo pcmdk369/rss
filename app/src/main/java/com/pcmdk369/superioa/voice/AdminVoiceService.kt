@@ -173,8 +173,8 @@ class AdminVoiceService : Service() {
                     }
                 if (settings.ttsEnabled) speaker.speak(result)
                 delay(900)
-            } catch (_: CancellationException) {
-                throw
+            } catch (e: CancellationException) {
+                throw e
             } catch (_: Exception) {
                 if (settings.ttsEnabled) speaker.speak("Command failed. Check SuperiOA for details.")
             } finally {
