@@ -4,12 +4,12 @@ Android task-orchestration assistant by PCMDK369: an LLM **plans** (strict JSON 
 
 Kotlin + Jetpack Compose, Room, EncryptedSharedPreferences, OkHttp. minSdk 26, target 34.
 
-> Build status: this source tree has not yet been compiled or run on a device in this workflow. The OpenJarvis-inspired Android-native primitives are being developed on the draft integration PR; do not treat them as production-verified until CI and device tests pass. See `CHECKLIST.md`.
+> CI status: GitHub Actions run `40446241841` passed unit tests and assembled a debug APK for commit `ffb471b6ac1bfe2643f55fe0c1c14b3f8e082cdf`. This verifies compilation/tests in CI, not real social-media workflows on a physical phone. Device smoke testing is still required; see `CHECKLIST.md`.
 
 ## Get the APK (no Android Studio needed)
-1. Create a GitHub repository and push this folder to the `main` branch.
-2. Open the repo's **Actions** tab, **Build APK**, and wait for it to finish (or press *Run workflow*).
-3. Download the artifact **SuperiOA-debug-apk** from the newest successful run, unzip it, and install `app-debug.apk` (allow "install unknown apps").
+1. Open the [SuperiOA Actions runs](https://github.com/pcmdk369/rss/actions) in this repository.
+2. Open the newest successful **Build SuperiOA APK** run.
+3. Download **SuperiOA-debug-apk** and install `app-debug.apk` (allow "install unknown apps"). For this verified build, see [run 40446241841](https://github.com/pcmdk369/rss/actions/runs/40446241841).
 
 ### Android install, Accessibility and LLM troubleshooting
 - **“Update failed” / “App not installed”**: GitHub-hosted runners may generate a different debug signing key for each clean runner. Android will reject an APK update if its signing certificate differs. If you do not need the old app's local data, uninstall the old SuperiOA first, then install the APK from the newest successful run. Uninstalling deletes local app data.
