@@ -45,6 +45,7 @@ data class TaskState(
     val approval: String? = null,
     val engine: Int? = null,
     val finalMessage: String? = null,
+    val goal: String? = null,
 )
 
 /**
@@ -107,7 +108,7 @@ class Orchestrator(
 
     suspend fun run(goal: String) {
         val started = System.currentTimeMillis()
-        _state.value = TaskState(status = TaskStatus.PLANNING)
+        _state.value = TaskState(status = TaskStatus.PLANNING, goal = goal.trim())
         var outcome = TaskStatus.FAILED
         var summary = ""
         var engineUsed: Int? = null
