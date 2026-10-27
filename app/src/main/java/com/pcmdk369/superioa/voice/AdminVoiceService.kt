@@ -13,12 +13,9 @@ import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import androidx.core.app.NotificationCompat
-import androidx.room.Room
 import com.pcmdk369.superioa.R
-import com.pcmdk369.superioa.llm.SettingsStore
-import com.pcmdk369.superioa.memory.AppDb
-import com.pcmdk369.superioa.orchestrator.Orchestrator
 import com.pcmdk369.superioa.ui.AdminVoiceActivity
+import com.pcmdk369.superioa.runtime.AgentRuntime
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -55,10 +52,11 @@ class AdminVoiceService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        settings = SettingsStore(applicationContext)
-        db = Room.databaseBuilder(applicationContext, AppDb::class.java, "superioa.db").build()
+        val runtime = AgentRuntime.get(applicationContext)
+        settings = runtime.settings
+        db = runtime.db
         speaker = Speaker(applicationContext)
-        orchestrator = Orchestrator(applicationContext, settings, db)
+        orchestrator = runtime.orchestrator
         createChannel()
     }
 
@@ -165,13 +163,8 @@ class AdminVoiceService : Service() {
                 stopRecognitionOnly()
                 speaker.speak("Command accepted.")
                 withContext(Dispatchers.Default) { orchestrator.run(command) }
-                val result = orchestrator.state.value.finalMessage
-                    ?: when (orchestrator.state.value.status.name) {
-                        "DONE" -> "Task completed."
-                        "CANCELLED" -> "Task stopped."
-                        else -> "Task ended. Check SuperiOA for details."
-                    }
-                if (settings.ttsEnabled) speaker.speak(result)
+                // The shared Orchestrator publishes the final result to the same UI state
+                // and speaks it through the runtime's TTS callback when TTS is enabled.
                 delay(900)
             } catch (e: CancellationException) {
                 throw e
@@ -244,7 +237,6 @@ class AdminVoiceService : Service() {
         releaseWakeLock()
         scope.cancel()
         speaker.shutdown()
-        db.close()
         super.onDestroy()
     }
 
