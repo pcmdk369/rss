@@ -1,6 +1,6 @@
 # Requirements checklist (mapped to List.md)
 
-Legend: **Implemented** = code written; **Untested** = not compiled or run in the authoring environment (no Android SDK, no network). Run `gradle :app:testDebugUnitTest` to verify.
+Legend: **CI-verified** = unit tests and debug APK build passed in GitHub Actions; **Device-untested** = no physical Android smoke test was available. Commit `ffb471b6ac1bfe2643f55fe0c1c14b3f8e082cdf` passed the unit-test and APK-build steps in [run 40446241841](https://github.com/pcmdk369/rss/actions/runs/40446241841). CI success does not guarantee every third-party app workflow succeeds on-device.
 
 | # | List.md requirement | Status | Where |
 |---|---|---|---|
@@ -8,21 +8,22 @@ Legend: **Implemented** = code written; **Untested** = not compiled or run in th
 | 2 | Bounded retries + backoff; config errors mark engine unhealthy; no failover on cancel / security denial | Implemented, unit tests written | `FailoverManager`, `FailoverTest` |
 | 2 | Shared OpenAI-compatible adapter; other wire formats need their own `EngineCaller` | Implemented (one adapter only) | `llm/OpenAiCompatibleCaller.kt` |
 | 2 | Record which engine succeeded and why earlier ones failed | Implemented | `LlmResult.attempts`, shown in task log |
-| 5 | Android AccessibilityService | Implemented, untested on device | `exec/SuperiAccessibilityService.kt` |
-| 6 | Universal Action Engine, 22 actions, strict schema validation | Implemented, unit tests written; bounded task ceiling raised to 50,000 actions across up to 5,000 planning rounds, with 12 actions per model reply | `action/Action.kt`, `exec/ActionEngine.kt`, `orchestrator/Orchestrator.kt` |
-| 7 | Master agent / Task Orchestrator, verification, replanning | Implemented, untested | `orchestrator/Orchestrator.kt` |
+| 5 | Android AccessibilityService | CI-compiled; device-untested | `exec/SuperiAccessibilityService.kt` |
+| 6 | Universal Action Engine, 22 generic actions, strict schema validation | CI-verified; device-untested. Bounded task ceiling: 50,000 actions across up to 5,000 planning rounds, with 12 actions per model reply | `action/Action.kt`, `exec/ActionEngine.kt`, `orchestrator/Orchestrator.kt` |
+| 7 | Master agent / Task Orchestrator, verification, replanning | CI-compiled; device-untested | `orchestrator/Orchestrator.kt` |
 | 8 | Local workflow memory (version, context, confidence, last-used, clear) | Implemented, unit tests for confidence | `memory/*`, Settings screen |
 | 3 | TTS (Android native) | Implemented | `voice/Speaker.kt` |
-| 9 | STT | Implemented via system `RecognizerIntent` (Voice button) | `ui/Screens.kt` |
+| 9 | STT and voice-to-command | CI-verified: Voice button starts recognized commands directly when Accessibility and an LLM engine are ready; device-untested | `ui/Screens.kt`, `runtime/AgentRuntime.kt` |
 | 4 | Chrome / browser skill | Minimal: opens https URLs in Chrome and drives visible controls through accessibility; no DOM bridge or OCR fallback | `skills/Skills.kt`, `ActionEngine.openApp` |
 | 12 | Secret management | Encrypted on-device storage; redaction in logs; no secrets in source | `SettingsStore`, `Redactor` |
 | 13 | Logging | Task history (goal, status, engine, summary). Cost/usage estimates NOT implemented | `memory/Db.kt` |
-| - | Security checkpoints (CAPTCHA/OTP/password/biometric/payment, high-impact UI controls), Stop button | Implemented, untested | `security/SecurityGate.kt`, Home screen |
+| - | Security checkpoints (CAPTCHA/OTP/password/biometric/payment, high-impact UI controls), Stop button | CI-compiled; device-untested | `security/SecurityGate.kt`, Home screen |
 | 1 | Supabase | **Not integrated.** Only an optional RLS schema is provided | `supabase/migrations/001_superioa_sync.sql` |
 | 10 | OCR / vision | **Not implemented** (interface stub reports "not configured") | `skills/Providers.kt` |
 | 11 | Web search API | **Not implemented** (interface stub) | `skills/Providers.kt` |
 | 14-18 | Image generation, official service APIs, crash reporting, push, backend worker | Not implemented (optional in List.md) | - |
 | - | `Human_Android_5000_Plus_Actions_Master_List.docx` | Not imported. The source catalogue contains 15,766 human-level actions; the APK currently exposes 22 generic executor actions, not 15,766 independently implemented integrations. Full coverage requires dynamic UI execution plus app/domain skills and capability-specific APIs where available | - |
+| - | Voice/Home runtime bridge and Android screen-threading | CI-verified code connection: voice and Home share one runtime; Accessibility reads/actions dispatch through Android main thread. Physical-device behavior still needs testing | `runtime/AgentRuntime.kt`, `ui/Screens.kt`, `exec/ActionEngine.kt`, `orchestrator/Orchestrator.kt` |
 
 ## Known limitations
 - Android 10+ restricts launching activities from the background; OPEN_APP works best while SuperiOA or the target flow is in the foreground.
