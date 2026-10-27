@@ -20,10 +20,9 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.Job
 
 /**
  * Continuous microphone mode is active only after the user opens the app, passes
@@ -47,17 +46,13 @@ class AdminVoiceService : Service() {
     private var wakeLock: PowerManager.WakeLock? = null
     private lateinit var runtime: AgentRuntime
     private lateinit var settings: com.pcmdk369.superioa.llm.SettingsStore
-    private lateinit var db: com.pcmdk369.superioa.memory.AppDb
     private lateinit var speaker: Speaker
-    private lateinit var orchestrator: com.pcmdk369.superioa.orchestrator.Orchestrator
 
     override fun onCreate() {
         super.onCreate()
         runtime = AgentRuntime.get(applicationContext)
         settings = runtime.settings
-        db = runtime.db
         speaker = Speaker(applicationContext)
-        orchestrator = runtime.orchestrator
         createChannel()
     }
 
