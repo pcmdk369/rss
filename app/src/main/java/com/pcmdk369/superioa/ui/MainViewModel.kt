@@ -33,11 +33,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private var job: Job? = null
 
     fun start(goal: String) {
-        if (goal.isBlank() || job?.isActive == true) return
-        job = viewModelScope.launch(Dispatchers.Default) { orchestrator.run(goal.trim()) }
+        if (goal.isBlank()) return
+        job = runtime.launchTask(viewModelScope, goal)
     }
 
     fun stop() {
+        runtime.stopTask()
         job?.cancel()
     }
 
