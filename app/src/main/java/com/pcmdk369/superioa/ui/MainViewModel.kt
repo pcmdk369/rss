@@ -6,21 +6,17 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.room.Room
 import com.pcmdk369.superioa.llm.EngineConfig
-import com.pcmdk369.superioa.llm.SettingsStore
-import com.pcmdk369.superioa.memory.AppDb
-import com.pcmdk369.superioa.orchestrator.Orchestrator
-import com.pcmdk369.superioa.voice.Speaker
+import com.pcmdk369.superioa.runtime.AgentRuntime
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 class MainViewModel(app: Application) : AndroidViewModel(app) {
-    val settings = SettingsStore(app)
-    private val db = Room.databaseBuilder(app, AppDb::class.java, "superioa.db").build()
-    private val speaker = Speaker(app)
-    private val orchestrator = Orchestrator(app, settings, db) { if (settings.ttsEnabled) speaker.speak(it) }
+    private val runtime = AgentRuntime.get(app)
+    val settings = runtime.settings
+    private val db = runtime.db
+    private val orchestrator = runtime.orchestrator
 
     val state = orchestrator.state
     val history = db.logs().recent()
@@ -70,7 +66,4 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { db.logs().clear() }
     }
 
-    override fun onCleared() {
-        speaker.shutdown()
-    }
 }
