@@ -56,6 +56,7 @@ class FailoverManager(
     private val backoffMs: Long = 500,
     private val delayFn: suspend (Long) -> Unit = { delay(it) },
     private val clock: () -> Long = { System.currentTimeMillis() },
+    private val enginePriority: List<Int> = emptyList(),
 ) {
     private val unhealthy = mutableSetOf<Int>()
     val unhealthyEngines: Set<Int> get() = unhealthy.toSet()
@@ -63,7 +64,9 @@ class FailoverManager(
     suspend fun complete(system: String, user: String): LlmResult {
         val secrets = engines.map { it.apiKey }
         val attempts = mutableListOf<Attempt>()
-        val candidates = engines.filter { it.isUsable && it.index !in unhealthy }.sortedBy { it.index }
+        val priority = enginePriority.withIndex().associate { it.value to it.index }
+        val candidates = engines.filter { it.isUsable && it.index !in unhealthy }
+            .sortedWith(compareBy<EngineConfig> { priority[it.index] ?: Int.MAX_VALUE }.thenBy { it.index })
 
         for (engine in candidates) {
             var tries = 0

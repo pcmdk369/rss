@@ -4,12 +4,12 @@ Android task-orchestration assistant by PCMDK369: an LLM **plans** (strict JSON 
 
 Kotlin + Jetpack Compose, Room, EncryptedSharedPreferences, OkHttp. minSdk 26, target 34.
 
-> Status: source written and statically reviewed only. It has **not** been compiled or run on a device by the author's tooling. See `CHECKLIST.md`.
+> CI status: GitHub Actions run `40446241841` passed unit tests and assembled a debug APK for commit `ffb471b6ac1bfe2643f55fe0c1c14b3f8e082cdf`. This verifies compilation/tests in CI, not real social-media workflows on a physical phone. Device smoke testing is still required; see `CHECKLIST.md`.
 
 ## Get the APK (no Android Studio needed)
-1. Create a GitHub repository and push this folder to the `main` branch.
-2. Open the repo's **Actions** tab, **Build APK**, and wait for it to finish (or press *Run workflow*).
-3. Download the artifact **SuperiOA-debug-apk** from the newest successful run, unzip it, and install `app-debug.apk` (allow "install unknown apps").
+1. Open the [SuperiOA Actions runs](https://github.com/pcmdk369/rss/actions) in this repository.
+2. Open the newest successful **Build SuperiOA APK** run.
+3. Download **SuperiOA-debug-apk** and install `app-debug.apk` (allow "install unknown apps"). For this verified build, see [run 40446241841](https://github.com/pcmdk369/rss/actions/runs/40446241841).
 
 ### Android install, Accessibility and LLM troubleshooting
 - **“Update failed” / “App not installed”**: GitHub-hosted runners may generate a different debug signing key for each clean runner. Android will reject an APK update if its signing certificate differs. If you do not need the old app's local data, uninstall the old SuperiOA first, then install the APK from the newest successful run. Uninstalling deletes local app data.
@@ -36,6 +36,19 @@ Output: `app/build/outputs/apk/debug/app-debug.apk`.
 - A partial wake lock keeps the CPU available while the service is active and can increase battery use.
 - **Limits:** Android may stop the service, the user can force-stop the app, reboot requires a fresh manual authentication/start, and recognition availability/network depends on the configured Android speech service. This is not a guaranteed 24/7 SLA.
 - A spoken passphrase can be recorded/replayed and is not voice biometrics. Keep the phone secured; do not use a banking PIN, account password, or other existing secret as the phrase. Audio may be processed by Android's configured speech-recognition provider. Sensitive tasks still require the app's approval/security flow.
+
+## OpenJarvis-inspired Android architecture
+
+SuperiOA adapts ideas from [OpenJarvis](https://github.com/open-jarvis/OpenJarvis) to Android instead of copying its Python/Rust/desktop source tree into the APK.
+
+- **Model catalog:** reports configured model IDs and endpoint metadata; it does not claim an unconfigured or unreachable model is available.
+- **Pluggable engine adapters:** `EngineAdapterRegistry` allows protocol adapters to be registered. The current default is OpenAI-compatible chat completions.
+- **Pluggable agent profiles and skills:** profiles add planning guidance; registered skills supply contextual instructions. They never execute device actions directly.
+- **Trace-driven routing:** recent local Room task outcomes influence the order of configured LLM engines. If no history exists, routing falls back to engine-number order.
+- **Local trace analysis:** task history can be summarized by outcome, engines used, and average duration.
+- **Security boundary:** all Android actions still pass through the existing strict action validator, security gate, and Accessibility executor.
+
+This Android port does **not** yet provide a bundled on-device LLM, embeddings/vector document store, arbitrary code execution sandbox, streaming generation, or a full OpenJarvis desktop/server stack. A loopback endpoint is only a local-compatible server endpoint; it is not proof that a model is running directly on the phone. See [the integration plan](docs/OPENJARVIS_INTEGRATION.md).
 
 ## Architecture
 ```

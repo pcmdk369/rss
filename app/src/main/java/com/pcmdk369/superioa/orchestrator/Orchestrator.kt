@@ -8,10 +8,12 @@ import com.pcmdk369.superioa.action.PlanResult
 import com.pcmdk369.superioa.exec.ActionEngine
 import com.pcmdk369.superioa.exec.ExecResult
 import com.pcmdk369.superioa.exec.SuperiAccessibilityService
+import com.pcmdk369.superioa.framework.AgentProfileRegistry
+import com.pcmdk369.superioa.framework.EngineAdapterRegistry
+import com.pcmdk369.superioa.framework.TraceDrivenRouter
 import com.pcmdk369.superioa.llm.AllEnginesFailedException
 import com.pcmdk369.superioa.llm.EngineCaller
 import com.pcmdk369.superioa.llm.FailoverManager
-import com.pcmdk369.superioa.llm.OpenAiCompatibleCaller
 import com.pcmdk369.superioa.llm.SecurityDenied
 import com.pcmdk369.superioa.llm.SettingsStore
 import com.pcmdk369.superioa.memory.AppDb
@@ -23,6 +25,7 @@ import com.pcmdk369.superioa.security.Redactor
 import com.pcmdk369.superioa.security.SecurityGate
 import com.pcmdk369.superioa.skills.SkillRegistry
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.currentCoroutineContext
@@ -31,6 +34,7 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonArray
 
@@ -42,6 +46,7 @@ data class TaskState(
     val approval: String? = null,
     val engine: Int? = null,
     val finalMessage: String? = null,
+    val goal: String? = null,
 )
 
 /**
@@ -53,7 +58,7 @@ class Orchestrator(
     private val ctx: Context,
     private val settings: SettingsStore,
     private val db: AppDb,
-    private val caller: EngineCaller = OpenAiCompatibleCaller(),
+    private val caller: EngineCaller = EngineAdapterRegistry.create("openai-compatible"),
     private val onSpeak: (String) -> Unit = {},
 ) {
     companion object {
@@ -104,7 +109,7 @@ class Orchestrator(
 
     suspend fun run(goal: String) {
         val started = System.currentTimeMillis()
-        _state.value = TaskState(status = TaskStatus.PLANNING)
+        _state.value = TaskState(status = TaskStatus.PLANNING, goal = goal.trim())
         var outcome = TaskStatus.FAILED
         var summary = ""
         var engineUsed: Int? = null
@@ -122,7 +127,7 @@ class Orchestrator(
             }
             val engine = ActionEngine(ctx)
             val (w, h) = engine.screenSize()
-            val startPkg = svc.currentPackage()
+            val startPkg = withContext(Dispatchers.Main.immediate) { svc.currentPackage() }
 
             // 1) Reuse a saved workflow only if confidence and app context allow it.
             if (saved != null && saved.appContext == startPkg) {
@@ -154,22 +159,26 @@ class Orchestrator(
             }
 
             // 2) Plan -> validate -> gate -> execute -> verify, in bounded rounds.
-            val failover = FailoverManager(settings.loadEngines(), caller)
+            val configuredEngines = settings.loadEngines()
+            // Learn routing preferences from local task traces; keep numeric order as a deterministic fallback.
+            val recentTraces = runCatching { db.logs().recent().first() }.getOrDefault(emptyList())
+            val enginePriority = TraceDrivenRouter.rankEngines(configuredEngines, recentTraces)
+            val failover = FailoverManager(configuredEngines, caller, enginePriority = enginePriority)
             val history = mutableListOf<String>()
             var finished = false
             var round = 0
             while (round < MAX_ROUNDS && !finished) {
                 round++
                 currentCoroutineContext().ensureActive()
-                var screen = svc.readScreen()
+                var screen = withContext(Dispatchers.Main.immediate) { svc.readScreen() }
                 SecurityGate.screenNeedsUser(screen)?.let { reason ->
                     flags.sensitive = true
                     if (!askUser("$reason Please complete it yourself, then tap Allow to continue.")) throw SecurityDenied(reason)
-                    screen = svc.readScreen()
+                    screen = withContext(Dispatchers.Main.immediate) { svc.readScreen() }
                 }
                 setStatus(TaskStatus.PLANNING)
                 val res = failover.complete(
-                    Prompts.system(SkillRegistry.hintsFor(goal)),
+                    Prompts.system(SkillRegistry.hintsFor(goal) + "\n- [agent-profile:${AgentProfileRegistry.resolve(goal).id}] " + AgentProfileRegistry.resolve(goal).systemGuidance),
                     Prompts.user(goal, Redactor.redact(screen), history.takeLast(6))
                 )
                 engineUsed = res.engineIndex

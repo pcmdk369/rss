@@ -13,20 +13,16 @@ import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import androidx.core.app.NotificationCompat
-import androidx.room.Room
 import com.pcmdk369.superioa.R
-import com.pcmdk369.superioa.llm.SettingsStore
-import com.pcmdk369.superioa.memory.AppDb
-import com.pcmdk369.superioa.orchestrator.Orchestrator
 import com.pcmdk369.superioa.ui.AdminVoiceActivity
+import com.pcmdk369.superioa.runtime.AgentRuntime
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 /**
  * Continuous microphone mode is active only after the user opens the app, passes
@@ -48,17 +44,15 @@ class AdminVoiceService : Service() {
     private var taskRunning = false
     @Volatile private var destroyed = false
     private var wakeLock: PowerManager.WakeLock? = null
-    private lateinit var settings: SettingsStore
-    private lateinit var db: AppDb
+    private lateinit var runtime: AgentRuntime
+    private lateinit var settings: com.pcmdk369.superioa.llm.SettingsStore
     private lateinit var speaker: Speaker
-    private lateinit var orchestrator: Orchestrator
 
     override fun onCreate() {
         super.onCreate()
-        settings = SettingsStore(applicationContext)
-        db = Room.databaseBuilder(applicationContext, AppDb::class.java, "superioa.db").build()
+        runtime = AgentRuntime.get(applicationContext)
+        settings = runtime.settings
         speaker = Speaker(applicationContext)
-        orchestrator = Orchestrator(applicationContext, settings, db)
         createChannel()
     }
 
@@ -164,17 +158,16 @@ class AdminVoiceService : Service() {
             try {
                 stopRecognitionOnly()
                 speaker.speak("Command accepted.")
-                withContext(Dispatchers.Default) { orchestrator.run(command) }
-                val result = orchestrator.state.value.finalMessage
-                    ?: when (orchestrator.state.value.status.name) {
-                        "DONE" -> "Task completed."
-                        "CANCELLED" -> "Task stopped."
-                        else -> "Task ended. Check SuperiOA for details."
-                    }
-                if (settings.ttsEnabled) speaker.speak(result)
-                delay(900)
-            } catch (_: CancellationException) {
-                throw
+                val task = runtime.launchTask(scope, command)
+                if (task == null) {
+                    if (settings.ttsEnabled) speaker.speak("Another command is already running.")
+                } else {
+                    task.join()
+                    // Shared Orchestrator updates the same task state displayed on Home.
+                    delay(900)
+                }
+            } catch (e: CancellationException) {
+                throw e
             } catch (_: Exception) {
                 if (settings.ttsEnabled) speaker.speak("Command failed. Check SuperiOA for details.")
             } finally {
@@ -244,7 +237,6 @@ class AdminVoiceService : Service() {
         releaseWakeLock()
         scope.cancel()
         speaker.shutdown()
-        db.close()
         super.onDestroy()
     }
 

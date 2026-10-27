@@ -25,8 +25,29 @@ object SettingsSkill : AppSkill {
 }
 
 object SkillRegistry {
-    private val skills: List<AppSkill> = listOf(ChromeSkill, SettingsSkill)
-    fun hintsFor(goal: String): String =
-        skills.filter { it.matches(goal) }.joinToString("\n") { "- [${it.id}] ${it.hints}" }
+    private val skills = linkedMapOf<String, AppSkill>(
+        ChromeSkill.id to ChromeSkill,
+        SettingsSkill.id to SettingsSkill,
+    )
+
+    @Synchronized
+    fun register(skill: AppSkill) {
+        require(skill.id.isNotBlank()) { "skill id must not be blank" }
+        skills[skill.id] = skill
+    }
+
+    @Synchronized
+    fun unregister(id: String): Boolean =
+        id != ChromeSkill.id && id != SettingsSkill.id && skills.remove(id) != null
+
+    @Synchronized
+    fun all(): List<AppSkill> = skills.values.toList()
+
+    fun hintsFor(goal: String): String {
+        val matches = synchronized(this) {
+            skills.values.filter { skill -> runCatching { skill.matches(goal) }.getOrDefault(false) }
+        }
+        return matches.joinToString("\n") { "- [${it.id}] ${it.hints}" }
             .ifBlank { "- No specific skill matched; use generic UI actions." }
+    }
 }

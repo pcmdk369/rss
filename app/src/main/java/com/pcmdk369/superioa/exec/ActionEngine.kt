@@ -8,7 +8,9 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import com.pcmdk369.superioa.action.ActionType
 import com.pcmdk369.superioa.action.AgentAction
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 
 sealed class ExecResult {
     data object Ok : ExecResult()
@@ -26,11 +28,11 @@ class ActionEngine(private val ctx: Context) {
         return m.widthPixels to m.heightPixels
     }
 
-    suspend fun execute(a: AgentAction): ExecResult {
+    suspend fun execute(a: AgentAction): ExecResult = withContext(Dispatchers.Main.immediate) {
         val svc = SuperiAccessibilityService.instance
-            ?: return ExecResult.Failed("Accessibility service is not enabled")
-        return when (a.type) {
-            ActionType.OPEN_APP -> openApp(svc, a.target ?: return ExecResult.Failed("no target"))
+            ?: return@withContext ExecResult.Failed("Accessibility service is not enabled")
+        when (a.type) {
+            ActionType.OPEN_APP -> openApp(svc, a.target ?: return@withContext ExecResult.Failed("no target"))
             ActionType.BACK -> global(svc, AccessibilityService.GLOBAL_ACTION_BACK)
             ActionType.HOME -> global(svc, AccessibilityService.GLOBAL_ACTION_HOME)
             ActionType.RECENTS -> global(svc, AccessibilityService.GLOBAL_ACTION_RECENTS)
