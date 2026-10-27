@@ -139,6 +139,11 @@ fun HomeScreen(vm: MainViewModel) {
     val running = state.status == TaskStatus.PLANNING || state.status == TaskStatus.RUNNING ||
         state.status == TaskStatus.WAITING_USER
 
+    // Voice-service commands and Home-screen commands now share the same Orchestrator state.
+    LaunchedEffect(state.goal) {
+        state.goal?.takeIf { it.isNotBlank() }?.let { goal = it }
+    }
+
     val speech = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
         r.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()?.let { goal = it }
     }
