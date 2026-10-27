@@ -18,12 +18,12 @@ import com.pcmdk369.superioa.ui.AdminVoiceActivity
 import com.pcmdk369.superioa.runtime.AgentRuntime
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.Job
 
 /**
  * Continuous microphone mode is active only after the user opens the app, passes
@@ -45,14 +45,15 @@ class AdminVoiceService : Service() {
     private var taskRunning = false
     @Volatile private var destroyed = false
     private var wakeLock: PowerManager.WakeLock? = null
-    private lateinit var settings: SettingsStore
-    private lateinit var db: AppDb
+    private lateinit var runtime: AgentRuntime
+    private lateinit var settings: com.pcmdk369.superioa.llm.SettingsStore
+    private lateinit var db: com.pcmdk369.superioa.memory.AppDb
     private lateinit var speaker: Speaker
-    private lateinit var orchestrator: Orchestrator
+    private lateinit var orchestrator: com.pcmdk369.superioa.orchestrator.Orchestrator
 
     override fun onCreate() {
         super.onCreate()
-        val runtime = AgentRuntime.get(applicationContext)
+        runtime = AgentRuntime.get(applicationContext)
         settings = runtime.settings
         db = runtime.db
         speaker = Speaker(applicationContext)
@@ -162,10 +163,14 @@ class AdminVoiceService : Service() {
             try {
                 stopRecognitionOnly()
                 speaker.speak("Command accepted.")
-                withContext(Dispatchers.Default) { orchestrator.run(command) }
-                // The shared Orchestrator publishes the final result to the same UI state
-                // and speaks it through the runtime's TTS callback when TTS is enabled.
-                delay(900)
+                val task = runtime.launchTask(scope, command)
+                if (task == null) {
+                    if (settings.ttsEnabled) speaker.speak("Another command is already running.")
+                } else {
+                    task.join()
+                    // Shared Orchestrator updates the same task state displayed on Home.
+                    delay(900)
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
