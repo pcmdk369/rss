@@ -145,11 +145,24 @@ fun HomeScreen(vm: MainViewModel) {
     }
 
     val speech = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
-        r.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()?.let { goal = it }
+        val spokenCommand = r.data
+            ?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+            ?.firstOrNull()
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
+        if (spokenCommand != null) {
+            goal = spokenCommand
+            // Voice is a command entry point, not merely dictation: run immediately
+            // when the local executor and at least one LLM engine are ready.
+            if (a11y && anyEngine && !running) {
+                vm.start(spokenCommand)
+            }
+        }
     }
 
     Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text("SuperiOA", style = MaterialTheme.typography.headlineSmall)
+        Text("Voice starts the command automatically when Accessibility and an LLM engine are ready. Use Run for typed commands.")
         if (!a11y) Text("\u26A0 Accessibility service is off. Enable it in Android settings (see the Settings tab).", color = MaterialTheme.colorScheme.error)
         if (!anyEngine) Text("\u26A0 No LLM engine configured. Open Settings and enable at least one engine.", color = MaterialTheme.colorScheme.error)
 
