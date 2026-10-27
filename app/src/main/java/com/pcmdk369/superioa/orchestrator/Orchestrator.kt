@@ -25,6 +25,7 @@ import com.pcmdk369.superioa.security.Redactor
 import com.pcmdk369.superioa.security.SecurityGate
 import com.pcmdk369.superioa.skills.SkillRegistry
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.currentCoroutineContext
@@ -126,7 +127,7 @@ class Orchestrator(
             }
             val engine = ActionEngine(ctx)
             val (w, h) = engine.screenSize()
-            val startPkg = svc.currentPackage()
+            val startPkg = withContext(Dispatchers.Main.immediate) { svc.currentPackage() }
 
             // 1) Reuse a saved workflow only if confidence and app context allow it.
             if (saved != null && saved.appContext == startPkg) {
@@ -169,11 +170,11 @@ class Orchestrator(
             while (round < MAX_ROUNDS && !finished) {
                 round++
                 currentCoroutineContext().ensureActive()
-                var screen = svc.readScreen()
+                var screen = withContext(Dispatchers.Main.immediate) { svc.readScreen() }
                 SecurityGate.screenNeedsUser(screen)?.let { reason ->
                     flags.sensitive = true
                     if (!askUser("$reason Please complete it yourself, then tap Allow to continue.")) throw SecurityDenied(reason)
-                    screen = svc.readScreen()
+                    screen = withContext(Dispatchers.Main.immediate) { svc.readScreen() }
                 }
                 setStatus(TaskStatus.PLANNING)
                 val res = failover.complete(
