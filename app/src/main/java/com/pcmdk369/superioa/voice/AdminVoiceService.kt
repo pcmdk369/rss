@@ -46,13 +46,11 @@ class AdminVoiceService : Service() {
     private var wakeLock: PowerManager.WakeLock? = null
     private lateinit var runtime: AgentRuntime
     private lateinit var settings: com.pcmdk369.superioa.llm.SettingsStore
-    private lateinit var speaker: Speaker
 
     override fun onCreate() {
         super.onCreate()
         runtime = AgentRuntime.get(applicationContext)
         settings = runtime.settings
-        speaker = Speaker(applicationContext)
         createChannel()
     }
 
@@ -105,7 +103,7 @@ class AdminVoiceService : Service() {
     private fun startListening() {
         if (listening || taskRunning || destroyed) return
         if (checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
-            speaker.speak("Microphone permission is required. Open SuperiOA voice settings.")
+            runtime.speak("Microphone permission is required. Open SuperiOA voice settings.")
             stopSelf()
             return
         }
@@ -236,7 +234,6 @@ class AdminVoiceService : Service() {
         stopListening()
         releaseWakeLock()
         scope.cancel()
-        speaker.shutdown()
         super.onDestroy()
     }
 
