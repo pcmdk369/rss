@@ -13,6 +13,10 @@ SuperiOA by PCMDK369 is a native Android task-orchestration assistant. The LLM p
 
 Google Play requires new apps and app updates to target Android 16 / API 36 from August 31, 2026. See the official [target API requirements](https://support.google.com/googleplay/android-developer/answer/11926878).
 
+## Requirements traceability
+
+The original SuperiOA API/integration requirements are preserved in the repository root at [List.md](List.md). The implementation status for all 18 integration items, including the deliberately deferred Supabase integration and missing optional providers, is tracked in [CHECKLIST.md](CHECKLIST.md).
+
 ## Get a test APK
 
 1. Open [GitHub Actions](https://github.com/pcmdk369/rss/actions).
