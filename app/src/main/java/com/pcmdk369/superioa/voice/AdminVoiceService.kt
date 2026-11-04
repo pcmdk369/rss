@@ -156,10 +156,10 @@ class AdminVoiceService : Service() {
         scope.launch {
             try {
                 stopRecognitionOnly()
-                if (settings.ttsEnabled) speaker.speak("Command accepted.")
+                if (settings.ttsEnabled) runtime.speak("Command accepted.")
                 val task = runtime.launchTask(scope, command)
                 if (task == null) {
-                    if (settings.ttsEnabled) speaker.speak("Another command is already running.")
+                    if (settings.ttsEnabled) runtime.speak("Another command is already running.")
                 } else {
                     task.join()
                     // Shared Orchestrator updates the same task state displayed on Home.
@@ -168,7 +168,7 @@ class AdminVoiceService : Service() {
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
-                if (settings.ttsEnabled) speaker.speak("Command failed. Check SuperiOA for details.")
+                if (settings.ttsEnabled) runtime.speak("Command failed. Check SuperiOA for details.")
             } finally {
                 taskRunning = false
                 scheduleListenRetry()
