@@ -6,7 +6,7 @@ import com.pcmdk369.superioa.action.AgentAction
 /** Decides when SuperiOA must stop and hand control to the human. It never tries to bypass anything. */
 object SecurityGate {
     private val screenTriggers = listOf(
-        "captcha", "i'm not a robot", "i am not a robot", "verification code", "one-time",
+        "captcha", "i'm not a robot", "i am not a robot", "verification code", "sensitive input field", "one-time",
         "one time password", "otp", "enter password", "passcode", "biometric", "fingerprint",
         "face id", "two-factor", "2-step", "2fa", "security code", "cvv", "card number",
         "confirm your identity", "confirm it's you", "payment", "checkout", "transfer money", "withdrawal", "confirm purchase"
