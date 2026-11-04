@@ -157,7 +157,7 @@ class AdminVoiceService : Service() {
         scope.launch {
             try {
                 stopRecognitionOnly()
-                speaker.speak("Command accepted.")
+                if (settings.ttsEnabled) speaker.speak("Command accepted.")
                 val task = runtime.launchTask(scope, command)
                 if (task == null) {
                     if (settings.ttsEnabled) speaker.speak("Another command is already running.")
