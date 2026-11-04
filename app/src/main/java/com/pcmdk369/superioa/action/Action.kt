@@ -193,10 +193,11 @@ object ActionValidator {
             }
             ActionType.TAP, ActionType.LONG_PRESS -> {
                 val t = a.target ?: ""
+                val actionName = if (type == ActionType.TAP) "TAP" else "LONG_PRESS"
                 when {
                     t.isNotEmpty() && t.length <= MAX_TARGET && a.x == null && a.y == null -> V.Ok(a)
                     t.isEmpty() && inX(a.x) && inY(a.y) -> V.Ok(a)
-                    else -> V.Bad("TAP needs either a target or in-bounds x,y, not both")
+                    else -> V.Bad("$actionName needs either a target or in-bounds x,y, not both")
                 }
             }
             ActionType.TYPE -> {
