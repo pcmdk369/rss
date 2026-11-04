@@ -7,10 +7,16 @@ import android.provider.Settings
 import android.speech.RecognizerIntent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -18,6 +24,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -34,14 +41,28 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.pcmdk369.superioa.exec.SuperiAccessibilityService
 import com.pcmdk369.superioa.llm.EngineConfig
@@ -60,7 +81,7 @@ fun AppRoot(vm: MainViewModel = viewModel()) {
     Scaffold(
         bottomBar = {
             NavigationBar {
-                listOf("Home", "History", "Settings").forEachIndexed { i, label ->
+                listOf("Voice", "Activity", "Settings").forEachIndexed { i, label ->
                     NavigationBarItem(
                         selected = tab == i,
                         onClick = { tab = i },
@@ -135,79 +156,206 @@ fun HomeScreen(vm: MainViewModel) {
     val state by vm.state.collectAsState()
     val a11y = rememberA11yEnabled()
     val anyEngine = vm.engines.any { it.isUsable }
-    var goal by remember { mutableStateOf("") }
-    val running = state.status == TaskStatus.PLANNING || state.status == TaskStatus.RUNNING ||
-        state.status == TaskStatus.WAITING_USER
+    val ctx = LocalContext.current
+    val running = state.status.name in setOf("PLANNING", "RUNNING", "WAITING_USER")
+    var listening by remember { mutableStateOf(false) }
+    var voiceError by remember { mutableStateOf<String?>(null) }
 
-    // Voice-service commands and Home-screen commands now share the same Orchestrator state.
-    LaunchedEffect(state.goal) {
-        state.goal?.takeIf { it.isNotBlank() }?.let { goal = it }
-    }
-
-    val speech = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
-        val spokenCommand = r.data
+    val speech = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        listening = false
+        val spokenCommand = result.data
             ?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
             ?.firstOrNull()
             ?.trim()
             ?.takeIf { it.isNotEmpty() }
         if (spokenCommand != null) {
-            goal = spokenCommand
-            // Voice is a command entry point, not merely dictation: run immediately
-            // when the local executor and at least one LLM engine are ready.
-            if (a11y && anyEngine && !running) {
-                vm.start(spokenCommand)
-            }
-        }
-    }
-
-    Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text("SuperiOA", style = MaterialTheme.typography.headlineSmall)
-        Text("Voice starts the command automatically when Accessibility and an LLM engine are ready. Use Run for typed commands.")
-        if (!a11y) Text("\u26A0 Accessibility service is off. Enable it in Android settings (see the Settings tab).", color = MaterialTheme.colorScheme.error)
-        if (!anyEngine) Text("\u26A0 No LLM engine configured. Open Settings and enable at least one engine.", color = MaterialTheme.colorScheme.error)
-
-        OutlinedTextField(
-            value = goal, onValueChange = { goal = it }, modifier = Modifier.fillMaxWidth(),
-            label = { Text("What should I do?") }, enabled = !running, minLines = 2
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(enabled = !running, onClick = {
-                try {
-                    speech.launch(
-                        Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
-                            .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                    )
-                } catch (ignored: ActivityNotFoundException) {
-                }
-            }) { Text("\uD83C\uDFA4 Voice") }
-            Button(enabled = !running && goal.isNotBlank() && a11y && anyEngine, onClick = { vm.start(goal) }) { Text("Run") }
-            Button(
-                enabled = running, onClick = { vm.stop() },
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-            ) { Text("Stop") }
-        }
-        Text(
-            "Status: ${state.status}" + (state.engine?.let { " (engine #$it)" } ?: ""),
-            style = MaterialTheme.typography.titleSmall
-        )
-        state.finalMessage?.let { if (!running) Text(it) }
-        if (state.log.isEmpty()) {
-            Text("No task yet. Example: \"Open Settings and turn on Wi-Fi, then verify it says On.\"")
+            voiceError = null
+            if (a11y && anyEngine && !running) vm.start(spokenCommand)
+            else voiceError = "Enable Accessibility and configure an AI engine before starting a task."
         } else {
-            LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                items(state.log.reversed()) { Text(it, style = MaterialTheme.typography.bodySmall) }
-            }
+            voiceError = "I couldn't hear that clearly. Tap the microphone and try again."
         }
     }
 
-    state.approval?.let { reason ->
-        AlertDialog(
-            onDismissRequest = {},
-            title = { Text("Your approval is needed") },
-            text = { Text(reason) },
-            confirmButton = { TextButton(onClick = { vm.approve(true) }) { Text("Allow / Done") } },
-            dismissButton = { TextButton(onClick = { vm.approve(false) }) { Text("Deny & stop") } }
+    val statusLabel = when {
+        listening -> "LISTENING"
+        state.status.name == "PLANNING" -> "THINKING"
+        state.status.name == "RUNNING" -> "WORKING"
+        state.status.name == "WAITING_USER" -> "NEEDS YOUR APPROVAL"
+        state.status.name == "SUCCESS" -> "COMPLETED"
+        state.status.name == "FAILED" -> "ATTENTION REQUIRED"
+        else -> "READY"
+    }
+
+    Column(
+        Modifier.fillMaxSize().background(Color(0xFF070B14)).verticalScroll(rememberScrollState()).padding(horizontal = 22.dp, vertical = 18.dp),
+        horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(18.dp)
+    ) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text("SUPERIOA", color = Color(0xFFEAF4FF), style = MaterialTheme.typography.titleLarge, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, letterSpacing = 2.sp)
+                Text("PERSONAL INTELLIGENCE", color = Color(0xFF7188A8), style = MaterialTheme.typography.labelSmall, letterSpacing = 2.sp)
+            }
+            Surface(color = if (a11y && anyEngine) Color(0xFF102A2A) else Color(0xFF30231F), shape = RoundedCornerShape(50)) {
+                Text(if (a11y && anyEngine) "SYSTEM READY" else "SETUP REQUIRED", modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp), color = if (a11y && anyEngine) Color(0xFF71E4C1) else Color(0xFFFFB18C), style = MaterialTheme.typography.labelSmall, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
+            }
+        }
+
+        Spacer(Modifier.height(8.dp))
+        Text(
+            when (statusLabel) {
+                "LISTENING" -> "I'm listening"
+                "THINKING" -> "Let me think"
+                "WORKING" -> "On it"
+                "NEEDS YOUR APPROVAL" -> "I need your approval"
+                "COMPLETED" -> "Task completed"
+                "ATTENTION REQUIRED" -> "I need your attention"
+                else -> "How can I help?"
+            },
+            color = Color(0xFFF1F7FF),
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = androidx.compose.ui.text.font.FontWeight.Medium
         )
+        Text(
+            when (statusLabel) {
+                "LISTENING" -> "Speak naturally. Your voice is the interface."
+                "THINKING" -> "Understanding your request and preparing a safe plan."
+                "WORKING" -> "Carrying out the task and checking the result."
+                "NEEDS YOUR APPROVAL" -> "A sensitive action is waiting for your decision."
+                "COMPLETED" -> "Your requested workflow has finished."
+                "ATTENTION REQUIRED" -> "The task could not be completed as expected."
+                else -> "Talk to SuperiOA. No typing. No chat windows."
+            },
+            color = Color(0xFF91A8C8),
+            style = MaterialTheme.typography.bodyMedium
+        )
+
+        VoiceOrb(
+            active = listening || running,
+            thinking = state.status.name == "PLANNING",
+            speaking = state.status.name == "SUCCESS"
+        )
+
+        Surface(color = Color(0xFF101A2B), shape = RoundedCornerShape(22.dp), modifier = Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                    Text("VOICE SESSION", color = Color(0xFFB8CDE8), style = MaterialTheme.typography.labelMedium, letterSpacing = 1.5.sp)
+                    Text(statusLabel, color = Color(0xFF65D9FF), style = MaterialTheme.typography.labelSmall, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                    VoiceStage("01", "LISTEN", listening || running)
+                    VoiceStage("02", "REASON", state.status.name == "PLANNING")
+                    VoiceStage("03", "RESPOND", state.status.name == "SUCCESS")
+                }
+            }
+        }
+
+        if (!a11y || !anyEngine) {
+            Surface(color = Color(0xFF2B1B24), shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("SETUP NEEDED", color = Color(0xFFFFB2C0), style = MaterialTheme.typography.labelMedium, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+                    if (!a11y) Text("Accessibility service is disabled. Enable it in Settings to let SuperiOA operate your device.", color = Color(0xFFE8C8D0), style = MaterialTheme.typography.bodySmall)
+                    if (!anyEngine) Text("No AI engine is configured. Add an endpoint in Settings to enable reasoning.", color = Color(0xFFE8C8D0), style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        }
+
+        voiceError?.let {
+            Text(it, color = Color(0xFFFFA6A6), style = MaterialTheme.typography.bodySmall)
+        }
+
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            Button(
+                onClick = {
+                    voiceError = null
+                    listening = true
+                    try {
+                        speech.launch(Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+                            .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                            .putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false)
+                            .putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak to SuperiOA"))
+                    } catch (e: ActivityNotFoundException) {
+                        listening = false
+                        voiceError = "Speech recognition is not available on this device."
+                    }
+                },
+                enabled = !running && !listening && a11y && anyEngine,
+                modifier = Modifier.weight(1f).height(58.dp),
+                shape = RoundedCornerShape(18.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2869E8), contentColor = Color.White, disabledContainerColor = Color(0xFF26344A))
+            ) {
+                Text(if (listening) "LISTENING…" else "●  TALK TO SUPERIOA", fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, letterSpacing = 1.sp)
+            }
+            OutlinedButton(
+                onClick = { vm.stop(); listening = false },
+                enabled = running,
+                modifier = Modifier.height(58.dp),
+                shape = RoundedCornerShape(18.dp),
+                border = BorderStroke(1.dp, Color(0xFF536985))
+            ) { Text("STOP", color = Color(0xFFFFA7B2), fontWeight = androidx.compose.ui.text.font.FontWeight.Bold) }
+        }
+
+        state.approval?.let { reason ->
+            Surface(color = Color(0xFF2A2418), shape = RoundedCornerShape(18.dp), modifier = Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("YOUR APPROVAL IS REQUIRED", color = Color(0xFFFFD58A), style = MaterialTheme.typography.labelMedium, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+                    Text(reason, color = Color(0xFFF2E4C8), style = MaterialTheme.typography.bodyMedium)
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Button(onClick = { vm.approve(true) }) { Text("Allow") }
+                        OutlinedButton(onClick = { vm.approve(false) }) { Text("Deny & stop") }
+                    }
+                }
+            }
+        }
+
+        state.finalMessage?.takeIf { !running }?.let {
+            Surface(color = Color(0xFF111D2C), shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
+                Text(it, modifier = Modifier.padding(14.dp), color = Color(0xFFB9CDE6), style = MaterialTheme.typography.bodySmall)
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+    }
+}
+
+@Composable
+private fun VoiceStage(number: String, label: String, active: Boolean) {
+    Column(horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(5.dp)) {
+        Text(number, color = if (active) Color(0xFF6DDCFF) else Color(0xFF52647D), style = MaterialTheme.typography.labelSmall)
+        Text(label, color = if (active) Color(0xFFE7F6FF) else Color(0xFF7488A4), style = MaterialTheme.typography.labelSmall, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
+    }
+}
+
+@Composable
+private fun VoiceOrb(active: Boolean, thinking: Boolean, speaking: Boolean) {
+    val transition = rememberInfiniteTransition(label = "voice-orb")
+    val pulse by transition.animateFloat(
+        initialValue = 0.92f,
+        targetValue = 1.08f,
+        animationSpec = infiniteRepeatable(tween(if (active) 900 else 2200, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "orb-pulse"
+    )
+    val rotation by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(tween(if (thinking) 5000 else 14000, easing = LinearEasing), RepeatMode.Restart),
+        label = "orb-rotation"
+    )
+    Box(Modifier.fillMaxWidth().height(300.dp), contentAlignment = Alignment.Center) {
+        Canvas(Modifier.size(280.dp)) {
+            val center = this.center
+            val scale = pulse
+            drawCircle(Color(0xFF145DCC).copy(alpha = 0.10f), radius = size.minDimension * 0.47f * scale)
+            drawCircle(Color(0xFF247DFF).copy(alpha = 0.12f), radius = size.minDimension * 0.39f * scale)
+            drawCircle(Color(0xFF62D8FF).copy(alpha = 0.38f), radius = size.minDimension * 0.31f, style = Stroke(width = 1.5.dp.toPx()))
+            drawCircle(Color(0xFF5D9DFF).copy(alpha = 0.42f), radius = size.minDimension * 0.39f, style = Stroke(width = 1.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(5.dp.toPx(), 8.dp.toPx()), rotation))
+            drawCircle(
+                brush = Brush.radialGradient(listOf(Color(0xFFE4FFFF), if (speaking) Color(0xFF55E5FF) else Color(0xFF50B9FF), Color(0xFF2455D8), Color(0xFF101B55)), center, size.minDimension * 0.27f),
+                radius = size.minDimension * 0.255f * scale,
+                center = center
+            )
+            drawCircle(Color.White.copy(alpha = 0.20f), radius = size.minDimension * 0.07f, center = Offset(center.x - size.minDimension * 0.075f, center.y - size.minDimension * 0.10f))
+        }
     }
 }
 
