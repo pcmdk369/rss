@@ -68,7 +68,7 @@ class Speaker(context: Context) : TextToSpeech.OnInitListener {
 
     private fun speakReady(text: String) {
         if (state != State.READY) return
-        tts.speak(text, TextToSpeech.QUEUE_ADD, null, "superioa-\${System.nanoTime()}")
+        tts.speak(text, TextToSpeech.QUEUE_ADD, null, "superioa-" + System.currentTimeMillis())
     }
 
     fun shutdown() {
