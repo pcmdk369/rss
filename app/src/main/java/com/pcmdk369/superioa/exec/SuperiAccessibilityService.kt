@@ -92,10 +92,26 @@ class SuperiAccessibilityService : AccessibilityService() {
     fun tapNode(query: String): Boolean =
         findNode(query)?.performAction(AccessibilityNodeInfo.ACTION_CLICK) ?: false
 
+    private val sensitiveInputPattern = Regex(
+        "\\b(password|passcode|pin|otp|one[- ]time|verification|security code|cvv)\\b",
+        RegexOption.IGNORE_CASE
+    )
+
+    private fun isSensitiveInput(node: AccessibilityNodeInfo): Boolean {
+        if (node.isPassword) return true
+        val description = listOfNotNull(
+            node.text?.toString(),
+            node.contentDescription?.toString(),
+            node.hintText?.toString(),
+            node.viewIdResourceName
+        ).joinToString(" ")
+        return sensitiveInputPattern.containsMatchIn(description)
+    }
+
     fun typeText(text: String): TypeResult {
         val root = rootInActiveWindow ?: return TypeResult.NO_FIELD
         val node = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT) ?: firstEditable(root) ?: return TypeResult.NO_FIELD
-        if (node.isPassword) return TypeResult.PASSWORD_FIELD
+        if (isSensitiveInput(node)) return TypeResult.PASSWORD_FIELD
         val args = Bundle()
         args.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, text)
         return if (node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)) TypeResult.OK else TypeResult.FAILED
@@ -104,7 +120,7 @@ class SuperiAccessibilityService : AccessibilityService() {
     fun selectAllFocused(): TypeResult {
         val root = rootInActiveWindow ?: return TypeResult.NO_FIELD
         val node = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT) ?: firstEditable(root) ?: return TypeResult.NO_FIELD
-        if (node.isPassword) return TypeResult.PASSWORD_FIELD
+        if (isSensitiveInput(node)) return TypeResult.PASSWORD_FIELD
         val length = node.text?.length ?: 0
         if (length == 0) return TypeResult.OK
         val args = Bundle().apply {
@@ -123,7 +139,7 @@ class SuperiAccessibilityService : AccessibilityService() {
     fun clearText(): TypeResult {
         val root = rootInActiveWindow ?: return TypeResult.NO_FIELD
         val node = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT) ?: firstEditable(root) ?: return TypeResult.NO_FIELD
-        if (node.isPassword) return TypeResult.PASSWORD_FIELD
+        if (isSensitiveInput(node)) return TypeResult.PASSWORD_FIELD
         val args = Bundle().apply {
             putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, "")
         }
@@ -162,12 +178,15 @@ class SuperiAccessibilityService : AccessibilityService() {
         )
     }
 
-    fun copyFocused(): Boolean =
-        rootInActiveWindow?.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)?.performAction(AccessibilityNodeInfo.ACTION_COPY) ?: false
+    fun copyFocused(): Boolean {
+        val node = rootInActiveWindow?.findFocus(AccessibilityNodeInfo.FOCUS_INPUT) ?: return false
+        if (isSensitiveInput(node)) return false
+        return node.performAction(AccessibilityNodeInfo.ACTION_COPY)
+    }
 
     fun pasteFocused(): Boolean {
         val node = rootInActiveWindow?.findFocus(AccessibilityNodeInfo.FOCUS_INPUT) ?: return false
-        if (node.isPassword) return false
+        if (isSensitiveInput(node)) return false
         return node.performAction(AccessibilityNodeInfo.ACTION_PASTE)
     }
 
