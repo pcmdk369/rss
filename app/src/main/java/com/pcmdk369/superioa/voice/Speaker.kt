@@ -2,14 +2,22 @@ package com.pcmdk369.superioa.voice
 
 import android.content.Context
 import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
+import android.util.Log
 import java.util.ArrayDeque
 import java.util.Locale
+import java.util.concurrent.atomic.AtomicLong
 
 /**
  * Android-native TTS with safe asynchronous initialization.
  * Speech requested before the engine is ready is queued instead of silently dropped.
  */
 class Speaker(context: Context) : TextToSpeech.OnInitListener {
+    companion object {
+        private const val TAG = "SuperiOA-TTS"
+    }
+
+    private val utteranceIds = AtomicLong(0)
     private enum class State { INITIALIZING, READY, FAILED, STOPPED }
 
     private val lock = Any()
@@ -19,6 +27,7 @@ class Speaker(context: Context) : TextToSpeech.OnInitListener {
 
     override fun onInit(status: Int) {
         if (status != TextToSpeech.SUCCESS) {
+            Log.e(TAG, "Android TTS initialization failed (status=$status)")
             synchronized(lock) {
                 state = State.FAILED
                 pending.clear()
@@ -32,8 +41,20 @@ class Speaker(context: Context) : TextToSpeech.OnInitListener {
             languageStatus = tts.setLanguage(Locale.US)
         }
 
+        tts.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+            override fun onStart(utteranceId: String?) = Unit
+            override fun onDone(utteranceId: String?) = Unit
+            override fun onError(utteranceId: String?) {
+                Log.e(TAG, "Speech playback failed (utterance=$utteranceId)")
+            }
+            override fun onError(utteranceId: String?, errorCode: Int) {
+                Log.e(TAG, "Speech playback failed (utterance=$utteranceId, error=$errorCode)")
+            }
+        })
+
         val queued = synchronized(lock) {
             if (languageStatus < TextToSpeech.LANG_AVAILABLE) {
+                Log.e(TAG, "No usable TTS voice for device locale or English fallback")
                 state = State.FAILED
                 pending.clear()
                 emptyList()
@@ -68,7 +89,11 @@ class Speaker(context: Context) : TextToSpeech.OnInitListener {
 
     private fun speakReady(text: String) {
         if (state != State.READY) return
-        tts.speak(text, TextToSpeech.QUEUE_ADD, null, "superioa-" + System.currentTimeMillis())
+        val utteranceId = "superioa-" + utteranceIds.incrementAndGet()
+        val result = tts.speak(text, TextToSpeech.QUEUE_ADD, null, utteranceId)
+        if (result == TextToSpeech.ERROR) {
+            Log.e(TAG, "Android TTS rejected speech request (utterance=$utteranceId)")
+        }
     }
 
     fun shutdown() {
