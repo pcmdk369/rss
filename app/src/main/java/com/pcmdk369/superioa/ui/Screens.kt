@@ -24,7 +24,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -39,7 +38,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -68,7 +66,6 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.pcmdk369.superioa.exec.SuperiAccessibilityService
 import com.pcmdk369.superioa.llm.EngineConfig
-import com.pcmdk369.superioa.orchestrator.TaskStatus
 import kotlinx.coroutines.delay
 import java.text.DateFormat
 import java.util.Date
@@ -159,7 +156,6 @@ fun HomeScreen(vm: MainViewModel) {
     val state by vm.state.collectAsState()
     val a11y = rememberA11yEnabled()
     val anyEngine = vm.engines.any { it.isUsable }
-    val ctx = LocalContext.current
     val running = state.status.name in setOf("PLANNING", "RUNNING", "WAITING_USER")
     var listening by remember { mutableStateOf(false) }
     var voiceError by remember { mutableStateOf<String?>(null) }
@@ -185,7 +181,7 @@ fun HomeScreen(vm: MainViewModel) {
         state.status.name == "PLANNING" -> "THINKING"
         state.status.name == "RUNNING" -> "WORKING"
         state.status.name == "WAITING_USER" -> "NEEDS YOUR APPROVAL"
-        state.status.name == "SUCCESS" -> "COMPLETED"
+        state.status.name == "DONE" -> "COMPLETED"
         state.status.name == "FAILED" -> "ATTENTION REQUIRED"
         else -> "READY"
     }
@@ -312,11 +308,6 @@ fun HomeScreen(vm: MainViewModel) {
             }
         }
 
-        state.finalMessage?.takeIf { !running }?.let {
-            Surface(color = Color(0xFF111D2C), shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
-                Text(it, modifier = Modifier.padding(14.dp), color = Color(0xFFB9CDE6), style = MaterialTheme.typography.bodySmall)
-            }
-        }
         Spacer(Modifier.height(8.dp))
     }
 }
