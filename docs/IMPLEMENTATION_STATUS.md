@@ -1,6 +1,6 @@
 # Implementation status
 
-This status maps the uploaded SuperiOA_Agent_Build_Command.txt, the existing repository and the available SuperiOA architecture document. The required root List.md was not found in the repository or available files, so a complete List.md audit remains blocked.
+This status maps the uploaded SuperiOA_Agent_Build_Command.txt, the existing repository and the available SuperiOA architecture document. The original List.md is now included at the repository root and its 18-item integration inventory is mapped in CHECKLIST.md.
 
 ## Implemented
 
@@ -26,7 +26,7 @@ This status maps the uploaded SuperiOA_Agent_Build_Command.txt, the existing rep
 - Third-party apps: generic accessibility actions only; no guarantee of compatibility with every app.
 - OCR/vision and web-search providers: not implemented.
 - Dedicated offline wake-word detection: not implemented. Admin Voice is manually started and uses Android's speech-recognition provider.
-- Supabase, cloud sync and remote workflow persistence: not integrated; local-first behavior remains.
+- Supabase, cloud sync and remote workflow persistence: not integrated; local-first behavior remains. This is a documented deviation from List.md's core/existing-stated Supabase item, following the current product direction.
 - Crash analytics, production monitoring, public privacy policy/store assets and Play Console submission: not configured.
 - Full support for thousands of app-specific operations: not implemented. The app exposes 22 generic action types.
 - Physical-device testing: not completed in this implementation session.
