@@ -454,8 +454,8 @@ private fun EngineCard(e: EngineConfig, onSave: (EngineConfig) -> Unit) {
     var model by remember(e) { mutableStateOf(e.modelId) }
     var on by remember(e) { mutableStateOf(e.enabled) }
     var timeout by remember(e) { mutableStateOf(e.timeoutSec.toString()) }
-    Card(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFF101A2B))) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                 Switch(checked = on, onCheckedChange = { on = it })
                 Text("  Engine ${e.index}", style = MaterialTheme.typography.titleSmall)
