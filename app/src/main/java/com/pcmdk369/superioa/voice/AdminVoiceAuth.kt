@@ -58,10 +58,28 @@ object AdminVoiceAuth {
         val salt = p.getString(SALT_KEY, null)?.fromHex() ?: return null
         val expected = p.getString(HASH_KEY, null)?.fromHex() ?: return null
         val rawWords = utterance.trim().split(Regex("\\s+")).filter { it.isNotBlank() }
-        // Match the normalized prefix, but preserve the recognized command's original casing.
-        for (count in 2 until rawWords.size) {
+        if (rawWords.size < 3) return null
+        val version = p.getInt(HASH_VERSION_KEY, 1)
+        val storedWordCount = p.getInt(WORD_COUNT_KEY, 0)
+        // New enrollments store the phrase word count, so PBKDF2 runs only once per utterance.
+        val candidateCounts = if (storedWordCount in 2 until rawWords.size) {
+            listOf(storedWordCount)
+        } else {
+            (2 until rawWords.size).toList() // legacy SHA-256 enrollment migration
+        }
+        for (count in candidateCounts) {
             val phrase = normalize(rawWords.take(count).joinToString(" "))
-            if (MessageDigest.isEqual(hash(phrase, salt), expected)) {
+            val candidate = if (version >= CURRENT_HASH_VERSION) strongHash(phrase, salt) else legacyHash(phrase, salt)
+            if (MessageDigest.isEqual(candidate, expected)) {
+                if (version < CURRENT_HASH_VERSION) {
+                    val upgradedSalt = ByteArray(32).also { SecureRandom().nextBytes(it) }
+                    p.edit()
+                        .putString(SALT_KEY, upgradedSalt.toHex())
+                        .putString(HASH_KEY, strongHash(phrase, upgradedSalt).toHex())
+                        .putInt(HASH_VERSION_KEY, CURRENT_HASH_VERSION)
+                        .putInt(WORD_COUNT_KEY, count)
+                        .apply()
+                }
                 return rawWords.drop(count).joinToString(" ").trim()
                     .trimStart(',', ':', ';')
                     .trim()
