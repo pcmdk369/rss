@@ -73,7 +73,7 @@ class Orchestrator(
         var sensitive = false
         var total = 0
         var retries = 0
-        var lastAction: AgentAction? = null
+        var lastFailedVerify: AgentAction? = null
     }
 
     private class AbortTask(message: String) : Exception(message)
@@ -266,27 +266,35 @@ class Orchestrator(
             f.total += 1
             if (f.total > MAX_ACTIONS) return "Action limit ($MAX_ACTIONS) reached"
 
-            SecurityGate.actionNeedsApproval(a)?.let { reason ->
-                f.sensitive = true
-                if (!askUser(reason)) throw SecurityDenied(reason)
-            }
-
             var act = a
             if (a.type == ActionType.RETRY) {
-                val last = f.lastAction ?: return "RETRY with nothing to retry"
+                val last = f.lastFailedVerify
+                    ?: return "RETRY is only allowed for a previously failed VERIFY action; other actions are replanned to avoid duplicate side effects"
                 f.retries += 1
                 if (f.retries > MAX_RETRIES) return "Retry limit reached"
                 act = last
+                f.lastFailedVerify = null
+            }
+
+            val actionScreen = if (act.type in setOf(ActionType.TAP, ActionType.LONG_PRESS, ActionType.TOGGLE)) {
+                withContext(Dispatchers.Main.immediate) { SuperiAccessibilityService.instance?.readScreen().orEmpty() }
+            } else ""
+            SecurityGate.actionNeedsApproval(act, actionScreen)?.let { reason ->
+                f.sensitive = true
+                if (!askUser(reason)) throw SecurityDenied(reason)
             }
 
             log("> ${act.describe()}")
             when (val r = engine.execute(act)) {
                 is ExecResult.Ok -> {
                     executed += act
-                    if (act.type != ActionType.WAIT && act.type != ActionType.VERIFY) f.lastAction = act
+                    f.lastFailedVerify = null
                 }
                 is ExecResult.Info -> {}
-                is ExecResult.Failed -> return "${act.describe()} failed: ${r.reason}"
+                is ExecResult.Failed -> {
+                    f.lastFailedVerify = act.takeIf { it.type == ActionType.VERIFY }
+                    return "${act.describe()} failed: ${r.reason}"
+                }
                 is ExecResult.NeedUser -> {
                     f.sensitive = true
                     if (!askUser(r.reason + " Tap Allow when done.")) throw SecurityDenied(r.reason)
