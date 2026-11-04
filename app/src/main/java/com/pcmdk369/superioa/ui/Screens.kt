@@ -28,6 +28,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -359,13 +360,13 @@ fun HistoryScreen(vm: MainViewModel) {
     Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("Execution history", style = MaterialTheme.typography.headlineSmall)
         if (logs.isEmpty()) {
-            Text("Nothing here yet. Finished tasks appear here (goal and result only; no screen contents are stored).")
+            Text("Your completed voice workflows will appear here. No screen contents are stored.", color = Color(0xFF91A8C8))
         } else {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(logs) { h ->
-                    Card(Modifier.fillMaxWidth()) {
+                    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFF101A2B))) {
                         Column(Modifier.padding(12.dp)) {
-                            Text(h.goal, style = MaterialTheme.typography.titleSmall)
+                            Text(h.goal, color = Color(0xFFEAF4FF), style = MaterialTheme.typography.titleSmall)
                             Text("${h.status}  \u00B7  ${DateFormat.getDateTimeInstance().format(Date(h.startedAt))}" +
                                 if (h.engine > 0) "  \u00B7  engine #${h.engine}" else "")
                             Text(h.summary, style = MaterialTheme.typography.bodySmall)
@@ -381,42 +382,68 @@ fun HistoryScreen(vm: MainViewModel) {
 fun SettingsScreen(vm: MainViewModel) {
     val ctx = LocalContext.current
     val workflows by vm.workflowCount.collectAsState(initial = 0)
+    val a11y = rememberA11yEnabled()
+    val anyEngine = vm.engines.any { it.isUsable }
+
     Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        Modifier.fillMaxSize().background(Color(0xFF070B14)).verticalScroll(rememberScrollState()).padding(horizontal = 18.dp, vertical = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Text("Settings", style = MaterialTheme.typography.headlineSmall)
-        Text("Accessibility is a protected Android setting. SuperiOA cannot grant it automatically. If blocked as a restricted setting, use App info to look for the Android-provided allow option.")
-        OutlinedButton(onClick = {
-            ctx.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-        }) { Text("Open Accessibility settings") }
-        OutlinedButton(onClick = {
-            ctx.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${ctx.packageName}")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-        }) { Text("Open SuperiOA app info") }
-
-        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-            Switch(checked = vm.tts, onCheckedChange = { vm.setTts(it) })
-            Text("  Speak results aloud (Android TTS)")
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text("Control center", color = Color(0xFFEAF4FF), style = MaterialTheme.typography.headlineMedium)
+            Text("Configure your voice assistant, intelligence and device access.", color = Color(0xFF91A8C8), style = MaterialTheme.typography.bodyMedium)
         }
 
-        Text("LLM engines (tried in order 1 \u2192 5)", style = MaterialTheme.typography.titleMedium)
-        Text(
-            "Each engine must expose an OpenAI-style POST {base URL}/chat/completions over https. " +
-                "Keys are stored encrypted on this device. Keys inside any app can be extracted from a rooted device; " +
-                "for long-lived keys prefer your own backend proxy URL as the base URL."
-        )
-        vm.engines.forEach { e -> EngineCard(e) { vm.saveEngine(it) } }
-
-        Text("Workflow memory", style = MaterialTheme.typography.titleMedium)
-        Text(
-            "Stores, per task: normalized goal, app package, validated action steps, success/failure counts, last-used time. " +
-                "Never stores passwords, OTPs, tokens or screen contents. Runs that hit a security checkpoint are never saved. " +
-                "Saved workflows: $workflows"
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = { vm.clearWorkflows() }) { Text("Clear workflows") }
-            OutlinedButton(onClick = { vm.clearHistory() }) { Text("Clear history") }
+        Surface(color = Color(0xFF101A2B), shape = RoundedCornerShape(20.dp), modifier = Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("SYSTEM HEALTH", color = Color(0xFFB8CDE8), style = MaterialTheme.typography.labelMedium, letterSpacing = 1.5.sp)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("Accessibility", color = Color(0xFFDAE7F8))
+                    Text(if (a11y) "ENABLED" else "DISABLED", color = if (a11y) Color(0xFF71E4C1) else Color(0xFFFFB18C), style = MaterialTheme.typography.labelSmall)
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("AI engine", color = Color(0xFFDAE7F8))
+                    Text(if (anyEngine) "CONFIGURED" else "NOT CONFIGURED", color = if (anyEngine) Color(0xFF71E4C1) else Color(0xFFFFB18C), style = MaterialTheme.typography.labelSmall)
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedButton(onClick = {
+                        ctx.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                    }, modifier = Modifier.weight(1f)) { Text("Accessibility") }
+                    OutlinedButton(onClick = {
+                        ctx.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${ctx.packageName}")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                    }, modifier = Modifier.weight(1f)) { Text("App permissions") }
+                }
+            }
         }
+
+        Surface(color = Color(0xFF101A2B), shape = RoundedCornerShape(20.dp), modifier = Modifier.fillMaxWidth()) {
+            Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Text("Spoken responses", color = Color(0xFFEAF4FF), style = MaterialTheme.typography.titleMedium)
+                    Text("SuperiOA speaks task results aloud using Android voice.", color = Color(0xFF91A8C8), style = MaterialTheme.typography.bodySmall)
+                }
+                Switch(checked = vm.tts, onCheckedChange = { vm.setTts(it) })
+            }
+        }
+
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("INTELLIGENCE ENGINES", color = Color(0xFF8FA8C9), style = MaterialTheme.typography.labelMedium, letterSpacing = 1.5.sp)
+            Text("Configure up to five compatible AI providers. SuperiOA tries enabled engines in priority order.", color = Color(0xFF91A8C8), style = MaterialTheme.typography.bodySmall)
+            vm.engines.forEach { engine -> EngineCard(engine) { vm.saveEngine(it) } }
+        }
+
+        Surface(color = Color(0xFF101A2B), shape = RoundedCornerShape(20.dp), modifier = Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("LOCAL MEMORY & PRIVACY", color = Color(0xFFB8CDE8), style = MaterialTheme.typography.labelMedium, letterSpacing = 1.2.sp)
+                Text("Saved workflows: $workflows", color = Color(0xFFEAF4FF), style = MaterialTheme.typography.titleMedium)
+                Text("Workflow history stays on this device. Passwords, OTPs, tokens and screen contents are not stored as reusable workflows. Sensitive tasks are excluded from workflow replay.", color = Color(0xFF91A8C8), style = MaterialTheme.typography.bodySmall)
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedButton(onClick = { vm.clearWorkflows() }, modifier = Modifier.weight(1f)) { Text("Clear memory") }
+                    OutlinedButton(onClick = { vm.clearHistory() }, modifier = Modifier.weight(1f)) { Text("Clear activity") }
+                }
+            }
+        }
+        Spacer(Modifier.height(12.dp))
     }
 }
 
