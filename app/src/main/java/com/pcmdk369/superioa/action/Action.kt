@@ -70,9 +70,10 @@ object ActionValidator {
     const val MAX_TARGET = 200
     const val MAX_WAIT_MS = 10_000L
 
-    private val ALLOWED_KEYS = setOf(
-        "type", "target", "text", "x", "y", "x2", "y2", "direction", "millis", "reason"
-    )
+    private val ROOT_KEYS = setOf("message", "done", "actions")
+    private val STRING_FIELDS = setOf("target", "text", "direction", "reason")
+    private val INTEGER_FIELDS = setOf("x", "y", "x2", "y2")
+    private val LONG_FIELDS = setOf("millis")
     private val DIRECTIONS = setOf("up", "down", "left", "right")
 
     private sealed class V {
@@ -95,8 +96,18 @@ object ActionValidator {
                 message = ""; done = false; arr = el
             }
             is JsonObject -> {
-                message = el.str("message") ?: ""
-                done = (el["done"] as? JsonPrimitive)?.booleanOrNull ?: false
+                val unknownRoot = el.keys - ROOT_KEYS
+                if (unknownRoot.isNotEmpty()) return PlanResult.Invalid("unknown plan field(s): " + unknownRoot.joinToString().take(80))
+                val messageValue = el["message"]
+                if (messageValue != null && (messageValue as? JsonPrimitive)?.isString != true) {
+                    return PlanResult.Invalid("'message' must be a string")
+                }
+                val doneValue = el["done"] as? JsonPrimitive
+                if (el.containsKey("done") && doneValue?.booleanOrNull == null) {
+                    return PlanResult.Invalid("'done' must be a boolean")
+                }
+                message = messageValue?.let { (it as JsonPrimitive).content } ?: ""
+                done = doneValue?.booleanOrNull ?: false
                 arr = when (val a = el["actions"]) {
                     null -> JsonArray(emptyList())
                     is JsonArray -> a
@@ -109,6 +120,9 @@ object ActionValidator {
             return PlanResult.Invalid("Too many actions (${arr.size} > $MAX_ACTIONS_PER_PLAN)")
         }
         if (arr.isEmpty() && !done) return PlanResult.Invalid("Plan has no actions and is not done")
+        if (done && (arr.lastOrNull() as? JsonObject)?.str("type")?.equals("VERIFY", ignoreCase = true) != true) {
+            return PlanResult.Invalid("A completed plan must end with a VERIFY action in the same reply")
+        }
 
         val actions = ArrayList<AgentAction>()
         for ((i, item) in arr.withIndex()) {
@@ -122,11 +136,36 @@ object ActionValidator {
     }
 
     private fun validate(o: JsonObject, w: Int, h: Int): V {
-        val unknown = o.keys - ALLOWED_KEYS
-        if (unknown.isNotEmpty()) return V.Bad("unknown field(s): ${unknown.joinToString().take(80)}")
         val tName = o.str("type")?.trim()?.uppercase() ?: return V.Bad("missing 'type'")
         val type = ActionType.entries.firstOrNull { it.name == tName }
             ?: return V.Bad("unsupported type '${tName.take(30)}'")
+
+        val allowedFields = when (type) {
+            ActionType.OPEN_APP -> setOf("type", "target")
+            ActionType.TAP, ActionType.LONG_PRESS -> setOf("type", "target", "x", "y")
+            ActionType.TYPE -> setOf("type", "text")
+            ActionType.TOGGLE -> setOf("type", "target")
+            ActionType.SCROLL -> setOf("type", "direction")
+            ActionType.SWIPE -> setOf("type", "x", "y", "x2", "y2")
+            ActionType.WAIT -> setOf("type", "millis")
+            ActionType.VERIFY -> setOf("type", "target", "text")
+            ActionType.ABORT, ActionType.REQUEST_USER -> setOf("type", "reason")
+            else -> setOf("type")
+        }
+        val unknown = o.keys - allowedFields
+        if (unknown.isNotEmpty()) return V.Bad("field(s) not allowed for " + tName + ": " + unknown.joinToString().take(80))
+        for (field in o.keys.intersect(STRING_FIELDS)) {
+            val value = o[field] as? JsonPrimitive
+            if (value?.isString != true) return V.Bad("'$field' must be a string")
+        }
+        for (field in o.keys.intersect(INTEGER_FIELDS)) {
+            val value = o[field] as? JsonPrimitive
+            if (value == null || value.isString || value.intOrNull == null) return V.Bad("'$field' must be an integer")
+        }
+        for (field in o.keys.intersect(LONG_FIELDS)) {
+            val value = o[field] as? JsonPrimitive
+            if (value == null || value.isString || value.longOrNull == null) return V.Bad("'$field' must be an integer")
+        }
 
         val a = AgentAction(
             type = type,
@@ -137,8 +176,8 @@ object ActionValidator {
             millis = o.long("millis"),
             reason = o.str("reason")?.take(300),
         )
-        fun inX(v: Int?) = v != null && v in 0..w
-        fun inY(v: Int?) = v != null && v in 0..h
+        fun inX(v: Int?) = v != null && v in 0 until w
+        fun inY(v: Int?) = v != null && v in 0 until h
 
         return when (type) {
             ActionType.OPEN_APP -> {
@@ -155,9 +194,9 @@ object ActionValidator {
             ActionType.TAP, ActionType.LONG_PRESS -> {
                 val t = a.target ?: ""
                 when {
-                    t.isNotEmpty() && t.length <= MAX_TARGET -> V.Ok(a)
+                    t.isNotEmpty() && t.length <= MAX_TARGET && a.x == null && a.y == null -> V.Ok(a)
                     t.isEmpty() && inX(a.x) && inY(a.y) -> V.Ok(a)
-                    else -> V.Bad("TAP needs 'target' text/id or in-bounds x,y")
+                    else -> V.Bad("TAP needs either a target or in-bounds x,y, not both")
                 }
             }
             ActionType.TYPE -> {
