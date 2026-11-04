@@ -21,7 +21,9 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
+import okhttp3.ResponseBody
 import java.io.IOException
+import java.io.ByteArrayOutputStream
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
@@ -31,6 +33,10 @@ import kotlin.coroutines.resumeWithException
  * Providers with a different wire format need their own EngineCaller implementation.
  */
 class OpenAiCompatibleCaller(private val http: OkHttpClient = OkHttpClient()) : EngineCaller {
+
+    companion object {
+        private const val MAX_RESPONSE_BYTES = 1_048_576
+    }
 
     override suspend fun call(engine: EngineConfig, system: String, user: String): String {
         var base = engine.baseUrl.trim().trimEnd('/')
@@ -72,7 +78,7 @@ class OpenAiCompatibleCaller(private val http: OkHttpClient = OkHttpClient()) : 
                 throw EngineError.Retryable("network error (${e.javaClass.simpleName})", e)
             }
             resp.use { r ->
-                val responseText = r.body?.string().orEmpty()
+                val responseText = r.body?.let(::readLimited).orEmpty()
                 when {
                     r.code in 200..299 -> parseContent(responseText)
                     r.code == 408 || r.code == 429 || r.code >= 500 ->
@@ -82,6 +88,24 @@ class OpenAiCompatibleCaller(private val http: OkHttpClient = OkHttpClient()) : 
                 }
             }
         }
+    }
+
+    private fun readLimited(body: ResponseBody): String {
+        val output = ByteArrayOutputStream()
+        val buffer = ByteArray(8192)
+        var total = 0
+        body.byteStream().use { input ->
+            while (true) {
+                val count = input.read(buffer)
+                if (count < 0) break
+                total += count
+                if (total > MAX_RESPONSE_BYTES) {
+                    throw EngineError.Config("provider response exceeds the 1 MB safety limit")
+                }
+                output.write(buffer, 0, count)
+            }
+        }
+        return String(output.toByteArray(), Charsets.UTF_8)
     }
 
     private fun errorMessage(code: Int, body: String, engine: EngineConfig): String {
