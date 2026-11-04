@@ -11,6 +11,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -36,6 +37,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -79,8 +81,9 @@ fun AppRoot(vm: MainViewModel = viewModel()) {
     }
     var tab by remember { mutableStateOf(0) }
     Scaffold(
+        containerColor = Color(0xFF070B14),
         bottomBar = {
-            NavigationBar {
+            NavigationBar(containerColor = Color(0xFF0B1321), contentColor = Color(0xFFB8D2F3)) {
                 listOf("Voice", "Activity", "Settings").forEachIndexed { i, label ->
                     NavigationBarItem(
                         selected = tab == i,
@@ -348,7 +351,7 @@ private fun VoiceOrb(active: Boolean, thinking: Boolean, speaking: Boolean) {
             drawCircle(Color(0xFF145DCC).copy(alpha = 0.10f), radius = size.minDimension * 0.47f * scale)
             drawCircle(Color(0xFF247DFF).copy(alpha = 0.12f), radius = size.minDimension * 0.39f * scale)
             drawCircle(Color(0xFF62D8FF).copy(alpha = 0.38f), radius = size.minDimension * 0.31f, style = Stroke(width = 1.5.dp.toPx()))
-            drawCircle(Color(0xFF5D9DFF).copy(alpha = 0.42f), radius = size.minDimension * 0.39f, style = Stroke(width = 1.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(5.dp.toPx(), 8.dp.toPx()), rotation))
+            drawCircle(Color(0xFF5D9DFF).copy(alpha = 0.42f), radius = size.minDimension * 0.39f, style = Stroke(width = 1.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(5.dp.toPx(), 8.dp.toPx()), rotation)))
             drawCircle(
                 brush = Brush.radialGradient(listOf(Color(0xFFE4FFFF), if (speaking) Color(0xFF55E5FF) else Color(0xFF50B9FF), Color(0xFF2455D8), Color(0xFF101B55)), center, size.minDimension * 0.27f),
                 radius = size.minDimension * 0.255f * scale,
