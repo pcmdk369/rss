@@ -20,9 +20,12 @@ class AgentRuntime private constructor(context: Context) {
 
     val settings = SettingsStore(appContext)
     val db: AppDb = Room.databaseBuilder(appContext, AppDb::class.java, "superioa.db").build()
+    // One process-wide TTS engine is shared by Home tasks and Admin Voice.
     private val speaker = Speaker(appContext)
-    val orchestrator = Orchestrator(appContext, settings, db) {
-        if (settings.ttsEnabled) speaker.speak(it)
+    val orchestrator = Orchestrator(appContext, settings, db) { speak(it) }
+
+    fun speak(text: String) {
+        if (settings.ttsEnabled) speaker.speak(text)
     }
 
     @Volatile private var activeTask: Job? = null
