@@ -5,6 +5,8 @@ import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import java.security.MessageDigest
 import java.security.SecureRandom
+import javax.crypto.SecretKeyFactory
+import javax.crypto.spec.PBEKeySpec
 
 /**
  * Device credential/biometric is verified by AdminVoiceActivity.
@@ -15,6 +17,10 @@ object AdminVoiceAuth {
     private const val PREFS = "superioa_admin_voice"
     private const val SALT_KEY = "passphrase_salt"
     private const val HASH_KEY = "passphrase_hash"
+    private const val HASH_VERSION_KEY = "passphrase_hash_version"
+    private const val WORD_COUNT_KEY = "passphrase_word_count"
+    private const val CURRENT_HASH_VERSION = 2
+    private const val PBKDF2_ITERATIONS = 120_000
     private val lock = Any()
     private var pendingGrant: String? = null
 
@@ -36,10 +42,12 @@ object AdminVoiceAuth {
         val normalized = normalize(phrase)
         if (normalized.length < 8 || normalized.split(" ").size < 2) return false
         val salt = ByteArray(32).also { SecureRandom().nextBytes(it) }
-        val hash = hash(normalized, salt)
+        val hash = strongHash(normalized, salt)
         prefs(context).edit()
             .putString(SALT_KEY, salt.toHex())
             .putString(HASH_KEY, hash.toHex())
+            .putInt(HASH_VERSION_KEY, CURRENT_HASH_VERSION)
+            .putInt(WORD_COUNT_KEY, normalized.split(" ").size)
             .apply()
         return true
     }
