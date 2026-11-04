@@ -98,7 +98,7 @@ class AdminVoiceActivity : FragmentActivity() {
                                 }
                             },
                             modifier = Modifier.fillMaxWidth()
-                        ) { Text("Start 24/7 Admin Voice") }
+                        ) { Text("Start Admin Voice") }
                         Button(
                             onClick = {
                                 startService(Intent(this@AdminVoiceActivity, AdminVoiceService::class.java).setAction(AdminVoiceService.ACTION_STOP))
