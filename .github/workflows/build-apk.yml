@@ -19,6 +19,12 @@ jobs:
     name: Test, lint and build Android APKs
     runs-on: ubuntu-24.04
     timeout-minutes: 45
+    env:
+      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+      RELEASE_SIGNING_ENABLED: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' && secrets.ANDROID_KEYSTORE_PASSWORD != '' && secrets.ANDROID_KEY_ALIAS != '' && secrets.ANDROID_KEY_PASSWORD != '' }}
 
     steps:
       - name: Checkout repository
@@ -51,6 +57,14 @@ jobs:
           test -f app/build.gradle.kts
           test -f app/src/main/AndroidManifest.xml
 
+      - name: Prepare private release keystore
+        if: env.RELEASE_SIGNING_ENABLED == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/superioa-release.jks"
+          echo "ANDROID_KEYSTORE_FILE=$RUNNER_TEMP/superioa-release.jks" >> "$GITHUB_ENV"
+
       - name: Run unit tests
         run: gradle --no-daemon :app:testDebugUnitTest
 
@@ -60,8 +74,12 @@ jobs:
       - name: Build debug APK
         run: gradle --no-daemon :app:assembleDebug
 
-      - name: Build unsigned release APK
+      - name: Build release APK
         run: gradle --no-daemon :app:assembleRelease
+
+      - name: Build signed Play Store bundle
+        if: env.RELEASE_SIGNING_ENABLED == 'true'
+        run: gradle --no-daemon :app:bundleRelease
 
       - name: Verify APKs and generate checksums
         shell: bash
@@ -73,8 +91,14 @@ jobs:
           test -n "$RELEASE_APK"
           mkdir -p artifacts
           cp "$DEBUG_APK" artifacts/superioa-debug.apk
-          cp "$RELEASE_APK" artifacts/superioa-release-unsigned.apk
-          (cd artifacts && sha256sum *.apk > SHA256SUMS.txt)
+          cp "$RELEASE_APK" artifacts/superioa-release.apk
+          if [ "$RELEASE_SIGNING_ENABLED" = "true" ]; then
+            "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose "$RELEASE_APK"
+            cp app/build/outputs/bundle/release/*.aab artifacts/superioa-release.aab
+          else
+            echo "Release APK is unsigned; validation artifact only."
+          fi
+          (cd artifacts && sha256sum *.apk *.aab 2>/dev/null > SHA256SUMS.txt || sha256sum *.apk > SHA256SUMS.txt)
           cat artifacts/SHA256SUMS.txt
 
       - name: Upload debug APK
@@ -85,12 +109,25 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      - name: Upload signed release APK and Play bundle
+        if: env.RELEASE_SIGNING_ENABLED == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: SuperiOA-release-signed
+          path: |
+            artifacts/superioa-release.apk
+            artifacts/superioa-release.aab
+            artifacts/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Upload unsigned release validation APK
+        if: env.RELEASE_SIGNING_ENABLED != 'true'
         uses: actions/upload-artifact@v4
         with:
           name: SuperiOA-release-unsigned-validation
           path: |
-            artifacts/superioa-release-unsigned.apk
+            artifacts/superioa-release.apk
             artifacts/SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 14
