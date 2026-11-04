@@ -4,7 +4,7 @@
 
 **Status: NOT YET APPROVED FOR PRODUCTION DISTRIBUTION.**
 
-The project has a native Android application and a real task-execution path, but a passing CI run is not proof of safe operation on a physical device. Production approval remains blocked on release signing setup, target-device acceptance tests, external provider configuration and review of the missing `List.md` requirements source.
+The project has a native Android application and a real task-execution path, but a passing CI run is not proof of safe operation on a physical device. Production approval remains blocked on release signing setup, target-device acceptance tests, external provider configuration and review of the List.md gaps.
 
 ## Implemented in the repository
 
@@ -25,7 +25,6 @@ The project has a native Android application and a real task-execution path, but
 
 ## Explicitly not complete
 
-- The repository does not contain the `List.md` file named as the primary requirements source in the uploaded build command. The current checklist is therefore based on the uploaded build command, existing repository code and the available SuperiOA architecture document, not on a nonexistent List.md.
 - No physical-device acceptance test has been completed in this work session.
 - No release keystore or GitHub signing secrets were supplied/configured.
 - No OCR/vision provider, web-search provider, browser DOM bridge or full third-party app skill catalogue is implemented.
@@ -63,7 +62,7 @@ Run these on the actual supported phone model(s), including the target Android/O
 
 ## Production release gates
 
-1. Supply or add `List.md` to the repository and map every requirement to an implemented file, test or explicit blocker.
+1. Review the 18-item List.md traceability table and decide whether the explicitly deferred Supabase item should remain local-first or be re-enabled.
 2. Configure private release keystore secrets using [RELEASE.md](RELEASE.md).
 3. Wait for the latest branch CI to pass tests, lint, debug APK and release APK builds.
 4. Install the signed release build on the target phone and complete the acceptance table above.
