@@ -39,7 +39,17 @@ class ActionValidatorTest {
     @Test fun malformedJsonRejected() = invalid("""{"actions":[{"type":"BACK"}""")
     @Test fun noJsonRejected() = invalid("Sure! I will open settings now.")
     @Test fun emptyNotDoneRejected() = invalid("""{"actions":[]}""")
-    @Test fun emptyDoneAccepted() { valid("""{"done":true,"actions":[]}""") }
+    @Test fun emptyDoneRejected() = invalid("""{"done":true,"actions":[]}""")
+    @Test fun doneRequiresFinalVerify() = invalid("""{"done":true,"actions":[{"type":"BACK"}]}""")
+    @Test fun doneWithFinalVerifyAccepted() {
+        valid("""{"done":true,"actions":[{"type":"VERIFY","target":"Saved"}]}""")
+    }
+    @Test fun doneVerifyMustBeLastAction() = invalid("""{"done":true,"actions":[{"type":"VERIFY","target":"Saved"},{"type":"BACK"}]}""")
+    @Test fun unknownRootFieldRejected() = invalid("""{"done":false,"actions":[{"type":"BACK"}],"debug":true}""")
+    @Test fun wrongDoneTypeRejected() = invalid("""{"done":"yes","actions":[{"type":"BACK"}]}""")
+    @Test fun actionFieldsAreSpecificToType() = invalid("""{"actions":[{"type":"BACK","target":"Settings"}]}""")
+    @Test fun tapCannotMixTargetAndCoordinates() = invalid("""{"actions":[{"type":"TAP","target":"Save","x":10,"y":10}]}""")
+    @Test fun coordinateEqualToScreenWidthRejected() = invalid("""{"actions":[{"type":"TAP","x":1080,"y":10}]}""")
     @Test fun tapOutOfBoundsRejected() = invalid("""{"actions":[{"type":"TAP","x":5000,"y":10}]}""")
     @Test fun tapNeedsTargetOrCoords() = invalid("""{"actions":[{"type":"TAP"}]}""")
     @Test fun tapCoordsInBoundsAccepted() { valid("""{"actions":[{"type":"TAP","x":100,"y":200}]}""") }
