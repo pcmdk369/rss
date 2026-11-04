@@ -5,6 +5,7 @@ import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
 import android.speech.RecognizerIntent
+import android.speech.SpeechRecognizer
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -108,6 +109,7 @@ fun OnboardingScreen(vm: MainViewModel) {
         Text(
             "\u2022 SuperiOA reads on-screen text and can tap, type and scroll, but only while a task you started is running.\n" +
                 "\u2022 Screen text (never password fields) is sent to the LLM provider YOU configure so it can plan. Obvious secrets are redacted first.\n" +
+                "\u2022 If you use Voice input or Admin Voice, audio is processed by Android's configured speech-recognition provider.\n" +
                 "\u2022 It stops and asks you for CAPTCHA, OTP, passwords, biometrics, payments and high-impact taps (send, delete, buy...).\n" +
                 "\u2022 A Stop button is always available. Your API keys are stored encrypted on this device."
         )
@@ -124,7 +126,7 @@ fun OnboardingScreen(vm: MainViewModel) {
         Text("If Android shows Restricted setting, open SuperiOA app info and look for Allow restricted settings in the app-info menu. If your phone does not offer that option, Android/OEM policy may block Accessibility for this install source; the app cannot enable it by itself.")
         Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
             Checkbox(checked = agreed, onCheckedChange = { agreed = it })
-            Text("I understand and agree")
+            Text("I understand and agree: task screen text may be sent to my configured LLM provider, and voice audio may be processed by Android speech recognition.")
         }
         Button(enabled = agreed, onClick = { vm.finishOnboarding() }) { Text("Continue") }
     }
@@ -136,6 +138,7 @@ fun HomeScreen(vm: MainViewModel) {
     val a11y = rememberA11yEnabled()
     val anyEngine = vm.engines.any { it.isUsable }
     var goal by remember { mutableStateOf("") }
+    var voiceError by remember { mutableStateOf<String?>(null) }
     val running = state.status == TaskStatus.PLANNING || state.status == TaskStatus.RUNNING ||
         state.status == TaskStatus.WAITING_USER
 
@@ -151,12 +154,15 @@ fun HomeScreen(vm: MainViewModel) {
             ?.trim()
             ?.takeIf { it.isNotEmpty() }
         if (spokenCommand != null) {
+            voiceError = null
             goal = spokenCommand
             // Voice is a command entry point, not merely dictation: run immediately
             // when the local executor and at least one LLM engine are ready.
             if (a11y && anyEngine && !running) {
                 vm.start(spokenCommand)
             }
+        } else {
+            voiceError = "No speech was recognized. Try Voice input again."
         }
     }
 
@@ -172,20 +178,27 @@ fun HomeScreen(vm: MainViewModel) {
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(enabled = !running, onClick = {
-                try {
-                    speech.launch(
-                        Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
-                            .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                    )
-                } catch (ignored: ActivityNotFoundException) {
+                voiceError = null
+                if (!SpeechRecognizer.isRecognitionAvailable(ctx)) {
+                    voiceError = "No Android speech-recognition service is available."
+                } else {
+                    try {
+                        speech.launch(
+                            Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+                                .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                        )
+                    } catch (_: ActivityNotFoundException) {
+                        voiceError = "Could not open Android speech recognition."
+                    }
                 }
-            }) { Text("\uD83C\uDFA4 Voice") }
+            }) { Text("Voice input") }
             Button(enabled = !running && goal.isNotBlank() && a11y && anyEngine, onClick = { vm.start(goal) }) { Text("Run") }
             Button(
                 enabled = running, onClick = { vm.stop() },
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
             ) { Text("Stop") }
         }
+        voiceError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         Text(
             "Status: ${state.status}" + (state.engine?.let { " (engine #$it)" } ?: ""),
             style = MaterialTheme.typography.titleSmall

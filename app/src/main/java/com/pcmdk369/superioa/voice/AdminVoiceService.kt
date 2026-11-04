@@ -21,6 +21,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -42,6 +43,8 @@ class AdminVoiceService : Service() {
     private var recognizer: SpeechRecognizer? = null
     private var listening = false
     private var taskRunning = false
+    private var retryJob: Job? = null
+    private var retryAttempts = 0
     @Volatile private var destroyed = false
     private var wakeLock: PowerManager.WakeLock? = null
     private lateinit var runtime: AgentRuntime
@@ -57,6 +60,7 @@ class AdminVoiceService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_STOP -> {
+                runtime.stopTask()
                 stopListening()
                 releaseWakeLock()
                 stopForeground(STOP_FOREGROUND_REMOVE)
@@ -65,8 +69,12 @@ class AdminVoiceService : Service() {
             }
             ACTION_START -> {
                 if (!AdminVoiceAuth.consumeStartGrant(intent.getStringExtra(EXTRA_GRANT)) ||
-                    !AdminVoiceAuth.isConfigured(this) ||
-                    !SpeechRecognizer.isRecognitionAvailable(this)) {
+                    !AdminVoiceAuth.isConfigured(this)) {
+                    stopSelf()
+                    return START_NOT_STICKY
+                }
+                if (!SpeechRecognizer.isRecognitionAvailable(this)) {
+                    runtime.speak("No speech-recognition service is available on this device.")
                     stopSelf()
                     return START_NOT_STICKY
                 }
@@ -104,14 +112,13 @@ class AdminVoiceService : Service() {
     private fun startListening() {
         if (listening || taskRunning || destroyed) return
         if (checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
-            runtime.speak("Microphone permission is required. Open SuperiOA voice settings.")
-            stopSelf()
+            stopForSpeechFailure("Microphone permission is required. Open SuperiOA voice settings.")
             return
         }
         try {
             if (recognizer == null) recognizer = SpeechRecognizer.createSpeechRecognizer(this).apply {
                 setRecognitionListener(object : RecognitionListener {
-                    override fun onReadyForSpeech(params: android.os.Bundle?) { listening = true }
+                    override fun onReadyForSpeech(params: android.os.Bundle?) { listening = true; retryAttempts = 0 }
                     override fun onBeginningOfSpeech() {}
                     override fun onRmsChanged(rmsdB: Float) {}
                     override fun onBufferReceived(buffer: ByteArray?) {}
@@ -122,6 +129,7 @@ class AdminVoiceService : Service() {
                     }
                     override fun onResults(results: android.os.Bundle?) {
                         listening = false
+                        retryAttempts = 0
                         val utterance = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                             ?.firstOrNull().orEmpty()
                         handleUtterance(utterance)
@@ -177,11 +185,30 @@ class AdminVoiceService : Service() {
     }
 
     private fun scheduleListenRetry() {
-        if (destroyed || taskRunning) return
-        scope.launch {
-            delay(700)
+        if (destroyed || taskRunning || retryJob?.isActive == true) return
+        if (!SpeechRecognizer.isRecognitionAvailable(this)) {
+            stopForSpeechFailure("Speech recognition is unavailable. Admin Voice has stopped.")
+            return
+        }
+        retryAttempts += 1
+        if (retryAttempts > 5) {
+            stopForSpeechFailure("Speech recognition repeatedly failed. Restart Admin Voice when ready.")
+            return
+        }
+        val backoffMs = (700L shl (retryAttempts - 1)).coerceAtMost(8_000L)
+        retryJob = scope.launch {
+            delay(backoffMs)
+            retryJob = null
             startListening()
         }
+    }
+
+    private fun stopForSpeechFailure(message: String) {
+        runtime.speak(message)
+        stopListening()
+        releaseWakeLock()
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        stopSelf()
     }
 
     private fun stopRecognitionOnly() {
@@ -190,6 +217,8 @@ class AdminVoiceService : Service() {
     }
 
     private fun stopListening() {
+        retryJob?.cancel()
+        retryJob = null
         listening = false
         try { recognizer?.cancel() } catch (_: Exception) {}
         try { recognizer?.destroy() } catch (_: Exception) {}

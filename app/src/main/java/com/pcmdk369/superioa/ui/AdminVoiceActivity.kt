@@ -5,14 +5,19 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.speech.SpeechRecognizer
 import androidx.fragment.app.FragmentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
@@ -24,6 +29,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -37,6 +43,7 @@ class AdminVoiceActivity : FragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
         setContent {
             var phrase by remember { mutableStateOf("") }
             var status by remember { mutableStateOf(
@@ -46,7 +53,7 @@ class AdminVoiceActivity : FragmentActivity() {
             statusSetter = { status = it }
             MaterialTheme(colorScheme = darkColorScheme()) {
                 Column(
-                    modifier = Modifier.fillMaxSize().padding(24.dp),
+                    modifier = Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).padding(24.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     Text("SuperiOA Admin Voice", style = MaterialTheme.typography.headlineSmall)
@@ -58,6 +65,7 @@ class AdminVoiceActivity : FragmentActivity() {
                             modifier = Modifier.fillMaxWidth(),
                             label = { Text("Admin voice passphrase") },
                             supportingText = { Text("Use a private phrase; do not use your account password or PIN.") },
+                            visualTransformation = PasswordVisualTransformation(),
                             singleLine = true
                         )
                         Button(
@@ -80,7 +88,9 @@ class AdminVoiceActivity : FragmentActivity() {
                     } else {
                         Button(
                             onClick = {
-                                if (!ensurePermissions()) {
+                                if (!SpeechRecognizer.isRecognitionAvailable(this@AdminVoiceActivity)) {
+                                    status = "No Android speech-recognition service is installed or available."
+                                } else if (!ensurePermissions()) {
                                     status = "Grant microphone and notification permissions, then tap Start again."
                                 } else {
                                     authenticate {

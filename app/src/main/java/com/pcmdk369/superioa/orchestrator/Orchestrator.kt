@@ -67,6 +67,7 @@ class Orchestrator(
         const val MAX_TASK_DURATION_MS = 10 * 60 * 1000L
         const val ACTION_TIMEOUT_MS = 15_000L
         const val LLM_CALL_BUDGET_MS = 180_000L
+        const val APPROVAL_TIMEOUT_MS = 120_000L
         // Keep replayable Room workflows compact; large tasks execute but are not persisted as one JSON blob.
         const val MAX_SAVED_WORKFLOW_ACTIONS = 500
     }
@@ -103,7 +104,7 @@ class Orchestrator(
         approvalWaiter = d
         _state.update { it.copy(status = TaskStatus.WAITING_USER, approval = reason) }
         try {
-            return d.await()
+            return withTimeoutOrNull(APPROVAL_TIMEOUT_MS) { d.await() } ?: false
         } finally {
             approvalWaiter = null
             _state.update { it.copy(status = TaskStatus.RUNNING, approval = null) }
@@ -196,7 +197,10 @@ class Orchestrator(
                 } ?: throw AbortTask("LLM planning time limit reached")
                 engineUsed = res.engineIndex
                 _state.update { it.copy(engine = res.engineIndex) }
-                res.attempts.filter { !it.success }.forEach { log("Engine #${it.engine} failed: ${it.error}") }
+                res.attempts.forEach { attempt ->
+                    if (attempt.success) log("Engine #${attempt.engine} succeeded in ${attempt.latencyMs}ms")
+                    else log("Engine #${attempt.engine} failed in ${attempt.latencyMs}ms: ${attempt.error}")
+                }
 
                 when (val pr = ActionValidator.parsePlan(res.text, w, h)) {
                     is PlanResult.Invalid -> {
@@ -237,12 +241,15 @@ class Orchestrator(
             throw e
         } catch (e: SecurityDenied) {
             outcome = TaskStatus.CANCELLED
-            summary = "Stopped: you declined a security checkpoint."
+            summary = "Stopped: the security checkpoint was declined or timed out."
         } catch (e: AbortTask) {
             outcome = TaskStatus.FAILED
             summary = "Aborted: ${e.message}"
         } catch (e: AllEnginesFailedException) {
             outcome = TaskStatus.FAILED
+            e.attempts.forEach { attempt ->
+                log("Engine #${attempt.engine} failed in ${attempt.latencyMs}ms: ${attempt.error}")
+            }
             summary = e.message ?: "All LLM engines failed."
         } catch (e: Exception) {
             outcome = TaskStatus.FAILED
@@ -386,7 +393,7 @@ ABORT {reason}
 REQUEST_USER {reason}
 Rules:
 - At most ${ActionValidator.MAX_ACTIONS_PER_PLAN} actions per reply. Unknown fields or types are rejected.
-- Set done=true only after a VERIFY action in the same reply confirms the goal.
+- Set done=true only when the final action in the same reply is VERIFY and it confirms the goal.\n- RETRY may only repeat a failed read-only VERIFY. Never use RETRY to repeat taps, typing, sending, deletion, purchases or other side effects.\n- READ_UI must be the only action in a non-final plan; the next planning round automatically refreshes the screen.
 - Use REQUEST_USER for CAPTCHA, OTP, passwords, biometrics, payments and account-security confirmations. Never type secrets.
 - Prefer visible-text targets. If the goal is impossible or unsafe, use ABORT with a reason.
 Skill hints:
