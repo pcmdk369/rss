@@ -72,6 +72,7 @@ class AdminVoiceService : Service() {
                 }
                 startForeground(NOTIFICATION_ID, buildNotification())
                 acquireWakeLock()
+                runtime.speak("Admin Voice is active.")
                 startListening()
                 return START_NOT_STICKY
             }
