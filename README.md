@@ -11,6 +11,12 @@ Kotlin + Jetpack Compose, Room, EncryptedSharedPreferences, OkHttp. minSdk 26, t
 2. Open the newest successful **Build SuperiOA APK** run.
 3. Download **SuperiOA-debug-apk** and install `app-debug.apk` (allow "install unknown apps"). For this verified build, see [run 40446241841](https://github.com/pcmdk369/rss/actions/runs/40446241841).
 
+### Admin Voice TTS diagnostics
+- Admin Voice, Home tasks, and task-completion speech use the same process-wide Android TTS engine. The service does not create a second engine.
+- Speech requested during asynchronous TTS initialization is queued. Playback errors and rejected utterances are written to Android logcat under `SuperiOA-TTS`.
+- To inspect TTS output from a connected development computer, run: `adb logcat -s SuperiOA-TTS`. This is diagnostic logging, not proof that a physical device has played the speech.
+- If the activation announcement is silent, check Settings → Speak results aloud, Android's default Text-to-speech engine, installed voice data, media volume, and the logcat errors.
+
 ### Android install, Accessibility and LLM troubleshooting
 - **“Update failed” / “App not installed”**: GitHub-hosted runners may generate a different debug signing key for each clean runner. Android will reject an APK update if its signing certificate differs. If you do not need the old app's local data, uninstall the old SuperiOA first, then install the APK from the newest successful run. Uninstalling deletes local app data.
 - **Use the newest artifact only**: open the latest successful run under Actions, download `SuperiOA-debug-apk`, extract the ZIP, and install `app-debug.apk`. Do not install an APK left over from an earlier run.
