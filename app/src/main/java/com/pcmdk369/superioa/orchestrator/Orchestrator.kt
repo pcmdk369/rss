@@ -36,6 +36,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.JsonArray
 
 enum class TaskStatus { IDLE, PLANNING, RUNNING, WAITING_USER, DONE, FAILED, CANCELLED }
@@ -62,9 +63,11 @@ class Orchestrator(
     private val onSpeak: (String) -> Unit = {},
 ) {
     companion object {
-        const val MAX_ROUNDS = 5_000
-        const val MAX_ACTIONS = 50_000
+        const val MAX_ROUNDS = 100
+        const val MAX_ACTIONS = 500
         const val MAX_RETRIES = 2
+        const val MAX_TASK_DURATION_MS = 10 * 60 * 1000L
+        const val ACTION_TIMEOUT_MS = 15_000L
         // Keep replayable Room workflows compact; large tasks execute but are not persisted as one JSON blob.
         const val MAX_SAVED_WORKFLOW_ACTIONS = 500
     }
@@ -74,6 +77,7 @@ class Orchestrator(
         var total = 0
         var retries = 0
         var lastFailedVerify: AgentAction? = null
+        val startedAtMs = System.currentTimeMillis()
     }
 
     private class AbortTask(message: String) : Exception(message)
@@ -170,6 +174,9 @@ class Orchestrator(
             while (round < MAX_ROUNDS && !finished) {
                 round++
                 currentCoroutineContext().ensureActive()
+                if (System.currentTimeMillis() - flags.startedAtMs > MAX_TASK_DURATION_MS) {
+                    throw AbortTask("task time limit reached")
+                }
                 var screen = withContext(Dispatchers.Main.immediate) { svc.readScreen() }
                 SecurityGate.screenNeedsUser(screen)?.let { reason ->
                     flags.sensitive = true
@@ -263,6 +270,7 @@ class Orchestrator(
     ): String? {
         for (a in actions) {
             currentCoroutineContext().ensureActive()
+            if (System.currentTimeMillis() - f.startedAtMs > MAX_TASK_DURATION_MS) return "Task time limit reached"
             f.total += 1
             if (f.total > MAX_ACTIONS) return "Action limit ($MAX_ACTIONS) reached"
 
@@ -285,7 +293,9 @@ class Orchestrator(
             }
 
             log("> ${act.describe()}")
-            when (val r = engine.execute(act)) {
+            val executionResult = withTimeoutOrNull(ACTION_TIMEOUT_MS) { engine.execute(act) }
+                ?: return "${act.describe()} timed out after ${ACTION_TIMEOUT_MS / 1000} seconds"
+            when (val r = executionResult) {
                 is ExecResult.Ok -> {
                     executed += act
                     f.lastFailedVerify = null
