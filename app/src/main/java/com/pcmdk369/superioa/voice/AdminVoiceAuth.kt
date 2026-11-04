@@ -104,10 +104,21 @@ object AdminVoiceAuth {
         .replace(Regex("[^\\p{L}\\p{N} ]"), " ")
         .trim().replace(Regex("\\s+"), " ")
 
-    private fun hash(value: String, salt: ByteArray): ByteArray {
+    private fun legacyHash(value: String, salt: ByteArray): ByteArray {
         val digest = MessageDigest.getInstance("SHA-256")
         digest.update(salt)
         return digest.digest(value.toByteArray(Charsets.UTF_8))
+    }
+
+    private fun strongHash(value: String, salt: ByteArray): ByteArray {
+        val chars = value.toCharArray()
+        val spec = PBEKeySpec(chars, salt, PBKDF2_ITERATIONS, 256)
+        return try {
+            SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256").generateSecret(spec).encoded
+        } finally {
+            spec.clearPassword()
+            chars.fill('\u0000')
+        }
     }
 
     private fun ByteArray.toHex() = joinToString("") { "%02x".format(it) }
