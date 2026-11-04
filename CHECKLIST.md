@@ -1,54 +1,75 @@
-# Requirements and implementation checklist
+# List.md requirement traceability
 
-## Source basis
-
-The uploaded build command requires `List.md` as the primary source of truth, but `List.md` was not found in the repository or available files. This checklist therefore maps the requirements visible in the uploaded `SuperiOA_Agent_Build_Command.txt`, the available SuperiOA architecture document and the existing repository. It is not a substitute for a complete List.md traceability audit.
+This checklist maps the original root List.md requirements to the current RSS implementation. Status is based on repository inspection, not assumptions in the source document.
 
 Status meanings:
-- **Implemented** — code exists in the repository.
-- **Partial** — only a limited adapter or scaffold exists.
-- **Not implemented** — no working implementation exists.
-- **Device test required** — CI cannot verify actual Android/OEM behavior.
-- **Blocked** — needs user-supplied source, secret, hardware, account or external approval.
+- **Implemented** — code exists.
+- **Partial** — limited implementation or interface only.
+- **Deferred** — intentionally not enabled in the current product direction.
+- **Not implemented** — no working integration.
+- **Device test required** — CI cannot verify real Android/OEM behavior.
 
-| Requirement | Status | Evidence / notes |
-|---|---|---|
-| Native Android application and navigable UI | Implemented | Kotlin, Compose, onboarding, Home, History, Settings |
-| Central Master Agent / Task Orchestrator | Implemented; device test required | `orchestrator/Orchestrator.kt` |
-| Five sequential provider slots | Implemented | `llm/Failover.kt`, `llm/SettingsStore.kt`; five slots are not five parallel agents |
-| Per-engine key, HTTPS base URL, model ID, enabled state and timeout | Implemented | Settings UI and encrypted local preferences |
-| Provider-specific wire formats | Partial | One OpenAI-compatible chat-completions adapter; other formats require an explicit adapter |
-| Strict action schema and allowlist | Implemented; unit tested | `action/Action.kt`; unknown root/action fields, mistyped fields and invalid bounds rejected |
-| Generic Universal Action Engine | Implemented; device test required | 22 generic action types in `exec/ActionEngine.kt` |
-| Android AccessibilityService | Implemented; device test required | User-enabled service in `exec/SuperiAccessibilityService.kt` |
-| Installed-app discovery | Implemented; device test required | PackageManager-based launcher discovery |
-| High-impact action confirmation | Implemented; unit tested | Target and visible-screen checks in `security/SecurityGate.kt` |
-| Authentication / CAPTCHA / OTP checkpoint | Partial | Text-triggered pause and manual user handoff; OCR/vision fallback is not implemented |
-| Stop / cancellation | Implemented; device test required | Home Stop and Admin Voice stop cancel active task |
-| Verification before completion | Implemented in validator and planner contract; unit tested | `done=true` requires final VERIFY in the same plan |
-| Bounded execution and retry safety | Implemented | 100 rounds, 500 actions, 10-minute task budget, 15-second action timeout; only failed VERIFY may be retried |
-| Workflow memory and confidence | Implemented; unit tested | Room, app context, confidence threshold, clear controls |
-| Secret redaction | Implemented; unit tested | `security/Redactor.kt`; sensitive input fields also block typing/copy/paste |
-| LLM API key storage | Implemented | Android Keystore-backed encrypted preferences; still not a substitute for server-side proxying |
-| Home STT | Implemented; device test required | Android SpeechRecognizer |
-| Android TTS | Implemented; device test required | Shared TTS engine, initialization queue and playback diagnostics |
-| Admin Voice | Partial; device test required | Device authentication + enrolled replayable passphrase + microphone foreground service; not a true offline wake word |
-| Browser / Chrome | Partial | Opens HTTPS URLs and operates exposed accessibility UI; no DOM bridge |
-| OCR / vision | Not implemented | No working OCR/vision provider |
-| Web search | Not implemented | No working search provider |
-| App-specific integrations across third-party apps | Partial | Generic UI actions only; each app's UI and policy may limit automation |
-| Optional Supabase / remote sync | Not integrated | Local-first; no Supabase client or cloud sync enabled |
-| API 36 / Android 16 target | Implemented in build configuration; CI verification pending | `app/build.gradle.kts` |
-| Debug APK CI | Implemented | GitHub Actions artifact |
-| Release APK build | Implemented as unsigned validation unless signing secrets are configured | `docs/RELEASE.md` |
-| Signed release APK + Play AAB | Conditional / blocked | Requires private keystore and four GitHub Actions secrets |
-| Physical-device acceptance tests | Blocked | Follow `docs/PRODUCTION_READINESS.md` |
-| Full List.md traceability | Blocked | Root `List.md` missing |
+## 1. Integration inventory (all 18 List.md items)
 
-## Important capability boundary
+| # | List.md component | Current implementation | Status / gap |
+|---:|---|---|---|
+| 1 | Supabase | No Supabase client or remote sync is wired. | **Deferred**. List.md calls this core/existing-stated; current project direction remains local-first. No project credentials, schema deployment or RLS verification was performed. |
+| 2 | Five-engine LLM manager | Five independent slots; sequential fallback in configured numeric order; bounded retry/backoff; network/timeout/429/5xx retry; configuration errors mark an engine unhealthy. | **Implemented**. One OpenAI-compatible adapter only; non-compatible providers need adapters. |
+| 3 | TTS | Shared Android TextToSpeech engine; async initialization queue; error diagnostics; setting to disable speech. | **Implemented**. Physical speaker/voice testing required. |
+| 4 | Chrome / Browser Skill | Opens HTTPS URLs in Chrome and uses Android accessibility-visible UI; Chrome skill hints exist. | **Partial**. No browser DOM bridge, tab manager or stable cross-site automation layer. |
+| 5 | Android AccessibilityService | User-enabled service reads accessible UI and executes supported actions. | **Implemented**. Physical-device permission and target-app tests required. |
+| 6 | Universal Action Engine | 22 typed action kinds, strict schema, action-specific fields, bounds and timeouts. | **Implemented**. UI compatibility varies by app. |
+| 7 | Master Agent / Task Orchestrator | One central orchestrator, agent profiles, skill hints, planning, validation, safety, execution, verification and recovery. | **Partial-to-implemented**. Dynamic hierarchical Sub-Agent / Pre-Sub-Agent task decomposition is not yet a full feature. |
+| 8 | Local workflow memory | Room stores app context, action steps, success/failure counts, version and last-used time; confidence gates replay. | **Implemented**. Device migration/recovery tests still required. |
+| 9 | STT | Android SpeechRecognizer for Home voice entry and Admin Voice. | **Implemented**. Android speech provider/language availability and real-device tests required. |
+| 10 | OCR / screen perception | NotConfiguredOcr interface only. | **Not implemented**. |
+| 11 | Web Search API | NotConfiguredWebSearch interface only. | **Not implemented**. Chrome browsing and web search remain separate. |
+| 12 | Secure secret/config management | EncryptedSharedPreferences backed by Android Keystore; no real credentials committed; provider fields are entered by the user. | **Implemented with limitation**. Keys in a client APK/device can be extracted; use a trusted HTTPS proxy for long-lived keys. |
+| 13 | Logging and usage/cost monitoring | Local task history, engine index, per-attempt error and latency in memory, redaction and task duration. | **Partial**. No persisted full attempt history, token-usage/cost calculation or analytics dashboard. |
+| 14 | Vision / image understanding | No configured vision provider. | **Not implemented**. |
+| 15 | Image generation | No image-generation integration in this Android agent. | **Out of current MVP scope**. |
+| 16 | Official app/service APIs | No app-specific official service adapters. | **Not implemented**. Generic accessibility actions only. |
+| 17 | Crash/error reporting | Local errors and task logs only. | **Not implemented** as a remote crash-reporting service. |
+| 18 | Push notifications / background jobs | Admin Voice uses a user-started microphone foreground service and ongoing notification. | **Partial**. No remote job queue or guaranteed background task worker. |
 
-SuperiOA exposes 22 generic Android action types. It does not contain thousands of independently implemented app integrations. Actual execution depends on the visible UI, AccessibilityService support, explicit user permissions and any app-specific adapters added later.
+## 2. Five-engine failover requirements
 
-## Verification
+| List.md rule | Implementation |
+|---|---|
+| One logical LLM service, not five parallel agents | One FailoverManager; one provider call at a time |
+| Engine 1 through Engine 5 in configured order | Orchestrator now passes no trace-based priority; FailoverManager defaults to engine index order |
+| Retry network errors, timeouts, rate limits and selected server errors | OpenAI-compatible caller maps network errors, 408, 429 and 5xx to retryable errors |
+| Invalid key/model/request treated as configuration failure | Non-retryable HTTP responses become EngineError.Config and the engine is skipped |
+| Bounded retry and backoff | One retry per engine by default, 500 ms exponential backoff |
+| Record success/failure and latency | Attempt objects contain engine, success, safe error and latency; task UI logs failures and records winning engine |
+| Never leak keys | Redactor plus known-key redaction in failover diagnostics |
+| Do not repeat device side effects after LLM timeout | LLM calls occur only in the planning phase; failed side-effect actions are replanned, not blindly replayed |
+| Validate model response before execution | Strict ActionValidator before ActionEngine |
 
-The authoritative current status is the latest run on the `production-readiness` branch: [GitHub Actions](https://github.com/pcmdk369/rss/actions). Do not infer success from an earlier run. A successful CI run verifies only the tasks that CI executes; it does not replace the physical-device tests.
+Provider compatibility is explicit: the current caller supports OpenAI-compatible POST {base URL}/chat/completions. Five slots do not imply five different vendor protocols are implemented.
+
+## 3. Supabase decision
+
+List.md labels Supabase as core/existing-stated and describes possible Auth, Database, Storage and RLS responsibilities. The current RSS repository does not contain an active Supabase client or deployed schema. The current project direction is local-first with no Supabase integration. This is a documented product decision/deviation, not a completed Supabase requirement. If the owner later re-enables cloud sync, implement it separately with user-scoped authentication, RLS and server-side privileged secrets; never put a service-role key in the APK.
+
+## 4. Security, privacy and execution
+
+- Screen text needed to plan a task is sent to the LLM endpoint selected by the user. Onboarding discloses this and requires the user to agree before continuing. No screenshot is uploaded by the current planner.
+- Obvious secrets are redacted; password and sensitive verification input fields are masked from screen context and blocked from typing/copy/paste.
+- CAPTCHA, OTP, password, biometric and sensitive-screen checkpoints pause for the user.
+- Send/delete/publish/payment and other high-impact taps require confirmation based on target text and visible screen text, including coordinate-based taps.
+- A completed plan must end with a VERIFY action in the same reply.
+- RETRY can repeat only a previously failed read-only VERIFY; taps, typing and other side effects are not blindly repeated.
+- Stop cancels the active task; Admin Voice stop also cancels a voice-started task.
+- Execution is bounded to 100 planning rounds, 500 actions, 10 minutes per task and 15 seconds per Android action.
+- Workflow memory is local and can be cleared by the user.
+
+## 5. Tests and release readiness
+
+Automated tests exist for action validation, five-engine ordering/retry/failover, secret redaction, workflow confidence and high-impact security gates. GitHub Actions is configured for unit tests, Android lint, debug APK and release APK validation. Signed release APK/AAB requires a private user-owned keystore configured as GitHub Actions secrets.
+
+Physical-device acceptance tests, release signing setup, Play Console declarations and privacy/store review remain release gates. See [PRODUCTION_READINESS.md](docs/PRODUCTION_READINESS.md) and [RELEASE.md](docs/RELEASE.md).
+
+## 6. Source and capability boundary
+
+The source List.md and original build command are retained in the repository/library. The app exposes 22 generic Android action types; it does not implement thousands of app-specific operations. Real capabilities depend on the target app's accessibility tree, Android/OEM behavior and future tested skill/API adapters.
