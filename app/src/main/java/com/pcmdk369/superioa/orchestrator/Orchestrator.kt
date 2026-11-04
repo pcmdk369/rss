@@ -68,6 +68,7 @@ class Orchestrator(
         const val MAX_RETRIES = 2
         const val MAX_TASK_DURATION_MS = 10 * 60 * 1000L
         const val ACTION_TIMEOUT_MS = 15_000L
+        const val LLM_CALL_BUDGET_MS = 180_000L
         // Keep replayable Room workflows compact; large tasks execute but are not persisted as one JSON blob.
         const val MAX_SAVED_WORKFLOW_ACTIONS = 500
     }
@@ -120,7 +121,12 @@ class Orchestrator(
         val executed = mutableListOf<AgentAction>()
         val flags = RunFlags()
         val key = WorkflowConfidence.normalizeGoal(goal)
-        val saved = db.workflows().find(key)
+        val saved = try {
+            db.workflows().find(key)
+        } catch (e: Exception) {
+            log("Workflow memory unavailable: ${e.javaClass.simpleName}")
+            null
+        }
         var replayFailed = false
 
         try {
@@ -149,14 +155,14 @@ class Orchestrator(
                         runActions(plan.plan.actions, engine, mutableListOf(), flags)
                     } else "stored workflow is invalid"
                     if (fail == null) {
-                        recordOutcome(saved, key, true, null, startPkg)
+                        recordOutcomeSafely(saved, key, true, null, startPkg)
                         outcome = TaskStatus.DONE
                         summary = "Done (saved workflow)."
                         return
                     }
                     log("Saved workflow failed: $fail. Falling back to the LLM planner.")
                     replayFailed = true
-                    recordOutcome(saved, key, false, null, startPkg)
+                    recordOutcomeSafely(saved, key, false, null, startPkg)
                     flags.retries = 0
                     flags.total = 0
                 }
@@ -184,10 +190,14 @@ class Orchestrator(
                     screen = withContext(Dispatchers.Main.immediate) { svc.readScreen() }
                 }
                 setStatus(TaskStatus.PLANNING)
-                val res = failover.complete(
-                    Prompts.system(SkillRegistry.hintsFor(goal) + "\n- [agent-profile:${AgentProfileRegistry.resolve(goal).id}] " + AgentProfileRegistry.resolve(goal).systemGuidance),
-                    Prompts.user(goal, Redactor.redact(screen), history.takeLast(6))
-                )
+                val remainingMs = MAX_TASK_DURATION_MS - (System.currentTimeMillis() - flags.startedAtMs)
+                if (remainingMs <= 0) throw AbortTask("task time limit reached")
+                val res = withTimeoutOrNull(minOf(LLM_CALL_BUDGET_MS, remainingMs)) {
+                    failover.complete(
+                        Prompts.system(SkillRegistry.hintsFor(goal) + "\n- [agent-profile:${AgentProfileRegistry.resolve(goal).id}] " + AgentProfileRegistry.resolve(goal).systemGuidance),
+                        Prompts.user(goal, Redactor.redact(screen), history.takeLast(6))
+                    )
+                } ?: throw AbortTask("LLM planning time limit reached")
                 engineUsed = res.engineIndex
                 _state.update { it.copy(engine = res.engineIndex) }
                 res.attempts.filter { !it.success }.forEach { log("Engine #${it.engine} failed: ${it.error}") }
@@ -217,7 +227,7 @@ class Orchestrator(
                 summary = "Task finished."
                 if (!flags.sensitive && !replayFailed && executed.isNotEmpty()) {
                     if (executed.size <= MAX_SAVED_WORKFLOW_ACTIONS) {
-                        recordOutcome(saved, key, true, executed, startPkg)
+                        recordOutcomeSafely(saved, key, true, executed, startPkg)
                     } else {
                         log("Large workflow (" + executed.size + " actions) completed; replay snapshot skipped to keep local storage bounded.")
                     }
@@ -314,6 +324,20 @@ class Orchestrator(
             delay(350)
         }
         return null
+    }
+
+    private suspend fun recordOutcomeSafely(
+        existing: WorkflowEntity?,
+        key: String,
+        success: Boolean,
+        newSteps: List<AgentAction>?,
+        pkg: String,
+    ) {
+        try {
+            recordOutcome(existing, key, success, newSteps, pkg)
+        } catch (e: Exception) {
+            log("Workflow memory update failed: ${e.javaClass.simpleName}")
+        }
     }
 
     private suspend fun recordOutcome(
