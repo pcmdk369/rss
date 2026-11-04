@@ -31,7 +31,7 @@ The project has a native Android application and a real task-execution path, but
 - No OCR/vision provider, web-search provider, browser DOM bridge or full third-party app skill catalogue is implemented.
 - Admin Voice is not an offline wake-word engine and is not guaranteed to run continuously 24/7.
 - The app has 22 generic Android action types; it does not implement thousands of individual app integrations.
-- No Supabase client, remote workflow sync or cloud account backend is enabled.
+- No Supabase client, remote workflow sync or cloud account backend is enabled. List.md describes Supabase as core/existing-stated; this repository currently defers it to preserve the later local-first project direction.
 - Crash analytics, production monitoring, formal privacy-policy/store assets and Play Console review are still outstanding.
 
 ## Required physical-device acceptance tests
