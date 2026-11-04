@@ -51,6 +51,8 @@ class SuperiAccessibilityService : AccessibilityService() {
             if (n.isVisibleToUser) {
                 val label = if (n.isPassword) {
                     "[password field]"
+                } else if (isSensitiveInput(n)) {
+                    "[sensitive input field]"
                 } else {
                     listOfNotNull(n.text?.toString(), n.contentDescription?.toString()).joinToString(" / ")
                 }
