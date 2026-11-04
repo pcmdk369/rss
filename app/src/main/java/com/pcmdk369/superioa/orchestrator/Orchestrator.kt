@@ -10,7 +10,6 @@ import com.pcmdk369.superioa.exec.ExecResult
 import com.pcmdk369.superioa.exec.SuperiAccessibilityService
 import com.pcmdk369.superioa.framework.AgentProfileRegistry
 import com.pcmdk369.superioa.framework.EngineAdapterRegistry
-import com.pcmdk369.superioa.framework.TraceDrivenRouter
 import com.pcmdk369.superioa.llm.AllEnginesFailedException
 import com.pcmdk369.superioa.llm.EngineCaller
 import com.pcmdk369.superioa.llm.FailoverManager
@@ -34,7 +33,6 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.JsonArray
@@ -170,10 +168,8 @@ class Orchestrator(
 
             // 2) Plan -> validate -> gate -> execute -> verify, in bounded rounds.
             val configuredEngines = settings.loadEngines()
-            // Learn routing preferences from local task traces; keep numeric order as a deterministic fallback.
-            val recentTraces = runCatching { db.logs().recent().first() }.getOrDefault(emptyList())
-            val enginePriority = TraceDrivenRouter.rankEngines(configuredEngines, recentTraces)
-            val failover = FailoverManager(configuredEngines, caller, enginePriority = enginePriority)
+            // Preserve the user's configured primary-to-fallback order exactly.
+            val failover = FailoverManager(configuredEngines, caller)
             val history = mutableListOf<String>()
             var finished = false
             var round = 0
