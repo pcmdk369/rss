@@ -1,73 +1,136 @@
-# SuperiOA (MVP)
+# SuperiOA — Android Intelligent Operation Agent
 
-Android task-orchestration assistant by PCMDK369: an LLM **plans** (strict JSON actions), the app **validates, gates and executes** locally through Android AccessibilityService, then **verifies**.
+SuperiOA by PCMDK369 is a native Android task-orchestration assistant. The LLM plans; the Android app validates and gates every action; the local AccessibilityService performs supported UI operations; the orchestrator verifies outcomes and stops safely when it cannot confirm success.
 
-Kotlin + Jetpack Compose, Room, EncryptedSharedPreferences, OkHttp. minSdk 26, target 34.
+## Platform and build baseline
 
-> CI status: GitHub Actions run `40446241841` passed unit tests and assembled a debug APK for commit `ffb471b6ac1bfe2643f55fe0c1c14b3f8e082cdf`. This verifies compilation/tests in CI, not real social-media workflows on a physical phone. Device smoke testing is still required; see `CHECKLIST.md`.
+- Kotlin + Jetpack Compose
+- Android min SDK 26, compile SDK 36, target SDK 36
+- JDK 17, Android Gradle Plugin 8.13.2, Gradle 8.13
+- Room for local task/workflow history
+- Android Keystore-backed encrypted preferences for provider settings
+- OkHttp + HTTPS for configured LLM requests
 
-## Get the APK (no Android Studio needed)
-1. Open the [SuperiOA Actions runs](https://github.com/pcmdk369/rss/actions) in this repository.
-2. Open the newest successful **Build SuperiOA APK** run.
-3. Download **SuperiOA-debug-apk** and install `app-debug.apk` (allow "install unknown apps"). For this verified build, see [run 40446241841](https://github.com/pcmdk369/rss/actions/runs/40446241841).
+Google Play requires new apps and app updates to target Android 16 / API 36 from August 31, 2026. See the official [target API requirements](https://support.google.com/googleplay/android-developer/answer/11926878).
 
-### Admin Voice TTS diagnostics
-- Admin Voice, Home tasks, and task-completion speech use the same process-wide Android TTS engine. The service does not create a second engine.
-- Speech requested during asynchronous TTS initialization is queued. Playback errors and rejected utterances are written to Android logcat under `SuperiOA-TTS`.
-- To inspect TTS output from a connected development computer, run: `adb logcat -s SuperiOA-TTS`. This is diagnostic logging, not proof that a physical device has played the speech.
-- If the activation announcement is silent, check Settings → Speak results aloud, Android's default Text-to-speech engine, installed voice data, media volume, and the logcat errors.
+## Get a test APK
 
-### Android install, Accessibility and LLM troubleshooting
-- **“Update failed” / “App not installed”**: GitHub-hosted runners may generate a different debug signing key for each clean runner. Android will reject an APK update if its signing certificate differs. If you do not need the old app's local data, uninstall the old SuperiOA first, then install the APK from the newest successful run. Uninstalling deletes local app data.
-- **Use the newest artifact only**: open the latest successful run under Actions, download `SuperiOA-debug-apk`, extract the ZIP, and install `app-debug.apk`. Do not install an APK left over from an earlier run.
-- **“Restricted setting” for Accessibility**: this is enforced by Android for some sideloaded apps. Open SuperiOA App info and look for Android's “Allow restricted settings” option, sometimes in the overflow menu. If your device does not show it, use ADB from a trusted computer: enable Developer options and USB debugging, connect the phone, verify it with `adb devices`, then run `adb install -r app-debug.apk` from the folder containing the APK. This installs the app via ADB but does not itself grant Accessibility; enable SuperiOA manually in Android Accessibility settings and accept the system consent. Never enable USB debugging on a computer you do not trust.
-- **LLM is configured on the phone**: open SuperiOA → Settings and enable an engine. Supply its API key, HTTPS base URL, and exact model ID. The endpoint must support OpenAI-compatible `POST {base URL}/chat/completions`. A server-side environment variable is not automatically available to an already-installed Android app. Do not paste API keys into issues, screenshots, or public repository files.
-- **Stable updates for future builds**: configure a private, persistent signing keystore via GitHub Actions secrets and sign all distributed builds with that same key. Do not commit a keystore or its password to the repository. Until that is configured, treat each CI debug APK as a fresh install rather than a guaranteed in-place update.
-The workflow also runs the unit tests; failures are uploaded as `test-reports`.
+1. Open [GitHub Actions](https://github.com/pcmdk369/rss/actions).
+2. Open the latest successful **Android CI and Release Validation** run.
+3. Download **SuperiOA-debug-apk** and install `superioa-debug.apk`.
+4. Debug builds use application ID `com.pcmdk369.superioa.debug`; release builds use `com.pcmdk369.superioa`.
+
+The workflow runs unit tests, Android lint, a debug build and a release build. When a private release keystore is configured in GitHub Actions, it also signs the release APK and creates a Play Store AAB. Without those secrets, the release APK is intentionally unsigned and is only a build-validation artifact.
 
 ## Build locally
-Install Android Studio (JDK 17 + SDK 34), open this folder, let it sync (it creates the Gradle wrapper), then run **Build > Build APK(s)**.
-Command line with Gradle 8.9 installed: `gradle :app:testDebugUnitTest :app:assembleDebug`
-Output: `app/build/outputs/apk/debug/app-debug.apk`.
 
-## First run
-1. Open the app, read the disclosure, tap **Open Accessibility settings**, enable **SuperiOA**.
-2. **Settings > LLM engines**: enable at least one engine and fill in key, `https://` base URL and model ID (OpenAI-style `/chat/completions`). Engines 2-5 are fallbacks tried in order.
-3. **Home**: type or dictate a task, press **Run**. **Stop** cancels immediately. Approval dialogs appear for CAPTCHA/OTP/password/payment screens and high-impact UI controls.
+Install JDK 17, Android SDK Platform 36 and Build Tools 36.0.0. Install Gradle 8.13, then run:
 
-## Admin-only background voice mode
-- Main screen includes **Admin Voice Mode**. Enroll a private multi-word passphrase after Android device authentication; the passphrase hash is stored in Keystore-backed encrypted preferences.
-- To start listening, grant microphone and notification permissions and authenticate with Android biometric/device credential. The app starts a microphone foreground service with an ongoing notification and an explicit Stop action.
-- Each spoken instruction must begin with the enrolled passphrase; the service strips the passphrase before passing the command to the existing Orchestrator. The result is spoken through Android TTS.
-- A partial wake lock keeps the CPU available while the service is active and can increase battery use.
-- **Limits:** Android may stop the service, the user can force-stop the app, reboot requires a fresh manual authentication/start, and recognition availability/network depends on the configured Android speech service. This is not a guaranteed 24/7 SLA.
-- A spoken passphrase can be recorded/replayed and is not voice biometrics. Keep the phone secured; do not use a banking PIN, account password, or other existing secret as the phrase. Audio may be processed by Android's configured speech-recognition provider. Sensitive tasks still require the app's approval/security flow.
+```sh
+gradle --version
+gradle --no-daemon :app:testDebugUnitTest
+gradle --no-daemon :app:lintDebug
+gradle --no-daemon :app:assembleDebug
+gradle --no-daemon :app:assembleRelease
+```
 
-## OpenJarvis-inspired Android architecture
+Debug APK: `app/build/outputs/apk/debug/app-debug.apk`
 
-SuperiOA adapts ideas from [OpenJarvis](https://github.com/open-jarvis/OpenJarvis) to Android instead of copying its Python/Rust/desktop source tree into the APK.
+Unsigned release validation APK (unless signing variables are supplied): `app/build/outputs/apk/release/app-release-unsigned.apk`
 
-- **Model catalog:** reports configured model IDs and endpoint metadata; it does not claim an unconfigured or unreachable model is available.
-- **Pluggable engine adapters:** `EngineAdapterRegistry` allows protocol adapters to be registered. The current default is OpenAI-compatible chat completions.
-- **Pluggable agent profiles and skills:** profiles add planning guidance; registered skills supply contextual instructions. They never execute device actions directly.
-- **Trace-driven routing:** recent local Room task outcomes influence the order of configured LLM engines. If no history exists, routing falls back to engine-number order.
-- **Local trace analysis:** task history can be summarized by outcome, engines used, and average duration.
-- **Security boundary:** all Android actions still pass through the existing strict action validator, security gate, and Accessibility executor.
+See [release signing instructions](docs/RELEASE.md) before distributing a production build.
 
-This Android port does **not** yet provide a bundled on-device LLM, embeddings/vector document store, arbitrary code execution sandbox, streaming generation, or a full OpenJarvis desktop/server stack. A loopback endpoint is only a local-compatible server endpoint; it is not proof that a model is running directly on the phone. See [the integration plan](docs/OPENJARVIS_INTEGRATION.md).
+## First run and permissions
+
+1. Open SuperiOA and read the onboarding disclosure.
+2. Open Android Accessibility settings and explicitly enable SuperiOA. Android controls this permission; the app cannot enable it itself.
+3. Open **Settings → LLM engines**.
+4. Configure at least one of the five engine slots with an API key, HTTPS base URL, exact model ID and timeout. All provider fields start empty; the app does not silently assume a provider or model.
+5. Enter a task on Home and press **Run**. Use **Stop** to cancel the active task. Sensitive actions and authentication checkpoints pause for user approval.
+
+The configured endpoint must support OpenAI-compatible `POST {base URL}/chat/completions`. Providers using another request/response protocol need a dedicated adapter; the app does not pretend every API is compatible.
+
+## Voice
+
+### Home voice input
+Home voice input uses Android's installed speech-recognition service to transcribe a command. When Accessibility and an LLM engine are ready, it starts the task automatically.
+
+### Admin Voice
+Admin Voice is an explicitly started microphone foreground service:
+
+- Enroll a private multi-word passphrase after Android device authentication.
+- Grant microphone and notification permissions.
+- Authenticate with the device credential or supported biometric before starting.
+- Keep the ongoing notification visible; use its **Stop listening** action or the Admin Voice screen to stop.
+- Each recognized utterance must begin with the enrolled phrase. The phrase is a replayable passphrase, not voice biometrics.
+- The service is not a guaranteed 24/7 wake-word service. Android, the speech-recognition provider, battery controls and force-stop behavior can interrupt it.
+- Audio is processed by Android's configured speech-recognition provider. Keep the phone secured and never use an account password, PIN or banking secret as the phrase.
+
+Admin Voice, Home tasks and completion announcements share one Android TTS engine. TTS requests made during asynchronous initialization are queued. Diagnostic errors use the Android log tag `SuperiOA-TTS`; inspect with `adb logcat -s SuperiOA-TTS`.
 
 ## Architecture
-```
-Home UI -> Orchestrator -> FailoverManager (engines 1..5, sequential) -> LLM returns JSON plan
-        -> ActionValidator (strict schema) -> SecurityGate -> ActionEngine -> AccessibilityService
-        -> VERIFY / replan (max 5,000 rounds, 50,000 actions per task, 12 actions per plan, 2 retries per action) -> Workflow memory (Room) + TTS
-```
-- Actions: OPEN_APP, BACK, HOME, RECENTS, NOTIFICATIONS, QUICK_SETTINGS, TAP, LONG_PRESS, TOGGLE, TYPE, CLEAR_TEXT, SELECT_ALL, SCROLL, SWIPE, COPY, PASTE, READ_UI, WAIT, VERIFY, RETRY, ABORT, REQUEST_USER.
-- Failover happens only on planning calls (no side effects), so a timeout never repeats a tap or send.
-- Workflows are saved only after a verified success with no security checkpoint, reused only when the app context matches and confidence >= 0.70 (0.40-0.70 asks first).
 
-## Configuration names
-See `.env.example` (`LLM_ENGINE_1..5_API_KEY/BASE_URL/MODEL_ID`). They map to the Settings fields; nothing is hard-coded and no keys are committed.
+```
+User text / voice
+       ↓
+Master Agent / LLM Coordinator
+       ↓
+Five sequential configured provider slots (not five parallel agents)
+       ↓
+Strict JSON action plan
+       ↓
+Action schema validation
+       ↓
+Security gate + explicit user approval where needed
+       ↓
+Universal Action Engine
+       ↓
+Android AccessibilityService / supported Android intents
+       ↓
+Visible UI verification
+       ↓
+Bounded re-planning / fail-stop
+       ↓
+Room workflow memory + task history + optional TTS
+```
 
-## Tests
-`app/src/test`: action validation, failover order/retries/cancellation, secret redaction, workflow confidence.
+### Supported generic actions
+
+`OPEN_APP`, `BACK`, `HOME`, `RECENTS`, `NOTIFICATIONS`, `QUICK_SETTINGS`, `TAP`, `LONG_PRESS`, `TOGGLE`, `TYPE`, `CLEAR_TEXT`, `SELECT_ALL`, `SCROLL`, `SWIPE`, `COPY`, `PASTE`, `READ_UI`, `WAIT`, `VERIFY`, `RETRY`, `ABORT`, `REQUEST_USER`.
+
+The validator rejects unknown action types, unknown or mistyped fields, out-of-screen coordinates, oversized text, invalid URLs and plans that claim completion without ending in a successful `VERIFY`. The executor never runs model-generated code.
+
+Task limits: 100 planning rounds, 500 executed actions and 10 minutes per task; each Android action has a 15-second timeout. Only a failed read-only `VERIFY` may be retried by the `RETRY` action. Failed taps, typing and other side effects are replanned rather than blindly repeated.
+
+### Workflow memory
+
+Only verified, non-sensitive successful workflows are eligible for reuse. Reuse is app-context-aware and confidence-based. The app stores normalized task goals, app context, action steps, success/failure counts and last-used time. It does not intentionally store passwords, OTPs, access tokens or screen dumps. Users can clear workflow memory and task history in Settings.
+
+## Privacy and security boundaries
+
+- Accessibility is disclosed and must be enabled by the user in Android Settings.
+- Visible screen text needed to plan a user-started task is sent to the LLM endpoint the user configured. Obvious secrets are redacted first; password fields are masked and sensitive input fields are blocked from typing, copy and paste. Do not use the app on private screens unless you understand this data flow and trust the configured provider.
+- API keys are stored in Android Keystore-backed encrypted preferences, but a key stored on a user-controlled device is not equivalent to a server-side secret. For long-lived credentials, use a trusted HTTPS proxy you operate.
+- OTP, CAPTCHA, password, biometric and account-security checkpoints pause for the user. Payment, send, delete, publish and other high-impact controls require explicit confirmation.
+- Stop cancels the active task. The Admin Voice stop action also cancels an active voice-started task.
+- No Supabase client or remote workflow sync is enabled. The app remains local-first.
+- No screenshot upload, OCR, arbitrary code execution or hidden background automation is implemented.
+
+## Implemented versus not yet implemented
+
+Implemented in the current codebase: Compose onboarding/Home/History/Settings UI, five sequential engine slots, one OpenAI-compatible LLM adapter, typed action validation, bounded orchestration, AccessibilityService execution, user approval checkpoints, local Room workflow memory, Android STT/TTS and authenticated Admin Voice startup.
+
+Not yet implemented or not yet verified on a physical phone: OCR/vision, web-search provider, full browser DOM automation, app-specific integrations for every third-party app, a dedicated offline wake-word detector, external account sync, production crash analytics, and real-device compatibility testing across Android/OEM versions.
+
+The app exposes 22 generic Android actions; it does not contain 15,000 separately implemented app integrations. Actual reach depends on what each target app exposes through Android accessibility and on any app-specific skill/API adapters that are added and tested.
+
+## Quality checks
+
+```sh
+gradle --no-daemon :app:testDebugUnitTest
+gradle --no-daemon :app:lintDebug
+gradle --no-daemon :app:assembleDebug
+gradle --no-daemon :app:assembleRelease
+```
+
+CI results and downloadable artifacts are published under [GitHub Actions](https://github.com/pcmdk369/rss/actions). A successful CI build proves compilation and automated checks only; it does not replace the physical-device acceptance tests listed in [docs/PRODUCTION_READINESS.md](docs/PRODUCTION_READINESS.md).
