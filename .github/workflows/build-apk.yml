@@ -1,8 +1,8 @@
-name: Build SuperiOA APK
+name: Android CI and Release Validation
 
 on:
   push:
-    branches: [main, master]
+    branches: [main, master, production-readiness]
   pull_request:
     branches: [main, master]
   workflow_dispatch:
@@ -10,10 +10,15 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: android-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
+    name: Test, lint and build Android APKs
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 45
 
     steps:
       - name: Checkout repository
@@ -24,49 +29,79 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-          cache: gradle
 
-      - name: Setup Android SDK
+      - name: Set up pinned Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+
+      - name: Set up Android SDK 36
         uses: android-actions/setup-android@v4
         with:
-          packages: 'platform-tools'
+          packages: 'platform-tools platforms;android-36 build-tools;36.0.0'
           accept-android-sdk-licenses: true
           log-accepted-android-sdk-licenses: false
 
-      - name: Verify Android project
+      - name: Verify toolchain
         run: |
-          test -f settings.gradle.kts || test -f settings.gradle
-          test -f app/build.gradle.kts || test -f app/build.gradle
-          if [ ! -f gradlew ]; then
-            gradle wrapper --gradle-version 8.9
-          fi
-          chmod +x gradlew
           java -version
+          gradle --version
+          sdkmanager --list_installed
+          test -f settings.gradle.kts
+          test -f app/build.gradle.kts
+          test -f app/src/main/AndroidManifest.xml
 
       - name: Run unit tests
-        run: ./gradlew --no-daemon :app:testDebugUnitTest
+        run: gradle --no-daemon :app:testDebugUnitTest
 
-      - name: Build Debug APK
-        run: ./gradlew --no-daemon :app:assembleDebug
+      - name: Run Android lint
+        run: gradle --no-daemon :app:lintDebug
 
-      - name: Verify APK
+      - name: Build debug APK
+        run: gradle --no-daemon :app:assembleDebug
+
+      - name: Build unsigned release APK
+        run: gradle --no-daemon :app:assembleRelease
+
+      - name: Verify APKs and generate checksums
+        shell: bash
         run: |
-          find app/build/outputs/apk/debug -name '*.apk' -print
-          test -n "$(find app/build/outputs/apk/debug -name '*.apk' -print -quit)"
+          set -euo pipefail
+          DEBUG_APK="$(find app/build/outputs/apk/debug -name '*.apk' -print -quit)"
+          RELEASE_APK="$(find app/build/outputs/apk/release -name '*.apk' -print -quit)"
+          test -n "$DEBUG_APK"
+          test -n "$RELEASE_APK"
+          mkdir -p artifacts
+          cp "$DEBUG_APK" artifacts/superioa-debug.apk
+          cp "$RELEASE_APK" artifacts/superioa-release-unsigned.apk
+          (cd artifacts && sha256sum *.apk > SHA256SUMS.txt)
+          cat artifacts/SHA256SUMS.txt
 
-      - name: Upload Debug APK
+      - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
           name: SuperiOA-debug-apk
-          path: app/build/outputs/apk/debug/*.apk
+          path: artifacts/superioa-debug.apk
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 14
 
-      - name: Upload test reports
+      - name: Upload unsigned release validation APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: SuperiOA-release-unsigned-validation
+          path: |
+            artifacts/superioa-release-unsigned.apk
+            artifacts/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload test and lint reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: SuperiOA-test-reports
-          path: app/build/reports/tests/
+          name: SuperiOA-quality-reports
+          path: |
+            app/build/reports/tests/
+            app/build/reports/lint-results-debug.html
           if-no-files-found: ignore
-          retention-days: 7
+          retention-days: 14
