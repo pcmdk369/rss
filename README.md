@@ -71,8 +71,10 @@ SuperiOA is an automation research / MVP project—not a promise of unrestricted
 
 ### Multiple LLM engines
 - Supports configuration for up to five engines.
-- Each engine has its own enabled state, API key, HTTPS base URL, model ID and timeout settings.
-- Uses an OpenAI-compatible `POST {base-url}/chat/completions` request format.
+- Each engine has its own enabled state, API key/token, HTTPS base URL, model ID and timeout settings.
+- Provider-neutral: no vendor, company, model or API host is preselected. Configure any service that implements the OpenAI-compatible `POST {base-url}/chat/completions` contract.
+- The app accepts the provider's API key/token, base URL and exact model ID. Compatibility depends on the provider supporting the expected chat-completions request/response format.
+- Optional build-time defaults use `LLM_ENGINE_API`, `LLM_PROVIDER_URL` and `LLM_MODEL`; all may be left blank and configured in the app. Values are not hardcoded.
 - Records engine attempts and failure reasons in task results.
 - Failover is limited to planning calls; it does not retry a device-side tap or send action merely because a model request failed.
 
