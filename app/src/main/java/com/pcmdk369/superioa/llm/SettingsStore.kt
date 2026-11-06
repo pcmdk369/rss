@@ -63,6 +63,14 @@ class SettingsStore(context: Context) {
             .apply()
     }
 
+    var realtimeGatewayUrl: String
+        get() = prefs.getString("realtime_gateway_url", "") ?: ""
+        set(value) = prefs.edit().putString("realtime_gateway_url", value.trim()).apply()
+
+    var realtimeClientToken: String
+        get() = prefs.getString("realtime_client_token", "") ?: ""
+        set(value) = prefs.edit().putString("realtime_client_token", value.trim()).apply()
+
     var onboarded: Boolean
         get() = prefs.getBoolean("onboarded", false)
         set(v) = prefs.edit().putBoolean("onboarded", v).apply()
