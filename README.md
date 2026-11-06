@@ -50,7 +50,7 @@ SuperiOA is an automation research / MVP project—not a promise of unrestricted
 | Network client | OkHttp |
 | LLM protocol | OpenAI-compatible chat completions |
 | Automation | Android AccessibilityService |
-| Speech | Android Speech Recognition + native Text-to-Speech |
+| Voice | OpenAI Realtime speech-to-speech over native WebRTC; legacy Admin Voice uses Android Speech Recognition + native TTS |
 | Local security | EncryptedSharedPreferences, Android Keystore-backed protection, validation and approval gates |
 | Build output currently documented | Debug APK (not a signed production release) |
 
@@ -242,9 +242,9 @@ Visible screen text may be sent to the LLM provider configured by the user so th
 | Android components | AndroidX Activity, Core, Lifecycle, Biometric |
 | Persistence | Room |
 | Local encrypted preferences | AndroidX Security Crypto |
-| HTTP | OkHttp |
+| HTTP / signaling | OkHttp + WebRTC |
 | Serialization | kotlinx.serialization |
-| Async execution | Kotlin Coroutines |
+| Async execution | Kotlin Coroutines |\n| Realtime media | WebRTC Android SDK (`io.github.webrtc-sdk:android`) |
 | Database code generation | KSP |
 | Unit testing | JUnit 4 |
 | Device automation | Android AccessibilityService |
@@ -259,13 +259,13 @@ SuperiOA is an actively evolving MVP. The following distinctions matter:
 | Generic action validation and bounded orchestration | Implemented; CI-compiled |
 | Accessibility-based interaction | CI-compiled; physical-device testing required |
 | Local workflow memory | Implemented |
-| Native TTS / voice input | Implemented; physical-device testing required |
+| Realtime speech-to-speech over WebRTC | Implemented in PR; Android CI and physical-device testing required |\n| Legacy Admin Voice foreground mode | Implemented; device and environment dependent |
 | Admin foreground voice mode | Implemented; device and environment dependent |
 | Browser interaction | Basic visible-UI interaction; no DOM bridge or OCR fallback |
 | OCR / vision provider | Not implemented |
 | Web search API | Not implemented |
 | Bundled on-device LLM | Not implemented |
-| Streaming generation | Not implemented |
+| Realtime audio streaming | Implemented in PR; provider and device validation pending |
 | Production release signing | Not configured; current documented artifact is a debug APK |
 | Supabase sync | Not integrated; an optional RLS schema is present |
 | Cost / token usage estimates | Not implemented |
