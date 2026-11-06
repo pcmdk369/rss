@@ -6,12 +6,14 @@ import android.content.pm.PackageManager
 import android.media.AudioManager
 import androidx.core.content.ContextCompat
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
@@ -122,6 +124,7 @@ class RealtimeVoiceSession(
         audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
         audioManager.isSpeakerphoneOn = true
 
+        val iceGatheringComplete = CompletableDeferred<Unit>()
         val observer = object : PeerConnection.Observer {
             override fun onSignalingChange(state: PeerConnection.SignalingState) = Unit
             override fun onIceConnectionChange(state: PeerConnection.IceConnectionState) {
@@ -130,7 +133,9 @@ class RealtimeVoiceSession(
                 }
             }
             override fun onIceConnectionReceivingChange(receiving: Boolean) = Unit
-            override fun onIceGatheringChange(state: PeerConnection.IceGatheringState) = Unit
+            override fun onIceGatheringChange(state: PeerConnection.IceGatheringState) {
+                if (state == PeerConnection.IceGatheringState.COMPLETE) iceGatheringComplete.complete(Unit)
+            }
             override fun onIceCandidate(candidate: IceCandidate) = Unit
             override fun onIceCandidatesRemoved(candidates: Array<IceCandidate>) = Unit
             override fun onAddStream(stream: MediaStream) = Unit
@@ -139,7 +144,8 @@ class RealtimeVoiceSession(
             override fun onRenegotiationNeeded() = Unit
             override fun onAddTrack(receiver: RtpReceiver, streams: Array<MediaStream>) = Unit
         }
-        val rtc = pcFactory.createPeerConnection(PeerConnection.RTCConfiguration(emptyList()), observer)
+        val iceServers = listOf(PeerConnection.IceServer.builder("stun:stun.l.google.com:19302").createIceServer())
+        val rtc = pcFactory.createPeerConnection(PeerConnection.RTCConfiguration(iceServers), observer)
             ?: throw IllegalStateException("Could not create the WebRTC peer connection.")
         peer = rtc
 
@@ -168,6 +174,7 @@ class RealtimeVoiceSession(
 
         val offer = rtc.createOfferAwait()
         rtc.setLocalDescriptionAwait(offer)
+        withTimeout(15_000) { iceGatheringComplete.await() }
         val localSdp = rtc.localDescription?.description ?: throw IllegalStateException("WebRTC did not produce a local SDP offer.")
         val answerSdp = withContext(Dispatchers.IO) {
             val request = Request.Builder()
