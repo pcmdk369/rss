@@ -107,7 +107,7 @@ class Orchestrator(
         }
     }
 
-    suspend fun run(goal: String) {
+    suspend fun run(goal: String, speakResult: Boolean = true) {
         val started = System.currentTimeMillis()
         _state.value = TaskState(status = TaskStatus.PLANNING, goal = goal.trim())
         var outcome = TaskStatus.FAILED
@@ -249,7 +249,7 @@ class Orchestrator(
                     )
                 } catch (ignored: Exception) {
                 }
-                if (outcome == TaskStatus.DONE || outcome == TaskStatus.FAILED) onSpeak(safeSummary)
+                if (speakResult && (outcome == TaskStatus.DONE || outcome == TaskStatus.FAILED)) onSpeak(safeSummary)
             }
         }
     }
