@@ -376,7 +376,7 @@ fun SettingsScreen(vm: MainViewModel) {
 
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text("INTELLIGENCE ENGINES", color = Color(0xFF8FA8C9), style = MaterialTheme.typography.labelMedium, letterSpacing = 1.5.sp)
-            Text("Configure up to five compatible AI providers. SuperiOA tries enabled engines in priority order.", color = Color(0xFF91A8C8), style = MaterialTheme.typography.bodySmall)
+            Text("Provider-neutral configuration. Use any service that supports the OpenAI-compatible HTTPS chat completions API. No company, provider or model is preselected. Configure up to five independent engines.", color = Color(0xFF91A8C8), style = MaterialTheme.typography.bodySmall)
             vm.engines.forEach { engine -> EngineCard(engine) { vm.saveEngine(it) } }
         }
 
@@ -406,18 +406,18 @@ private fun EngineCard(e: EngineConfig, onSave: (EngineConfig) -> Unit) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                 Switch(checked = on, onCheckedChange = { on = it })
-                Text("  Engine ${e.index}", style = MaterialTheme.typography.titleSmall)
+                Text("  Custom provider ${e.index}", style = MaterialTheme.typography.titleSmall)
             }
             OutlinedTextField(
-                value = key, onValueChange = { key = it }, label = { Text("LLM_ENGINE_${e.index}_API_KEY") },
+                value = key, onValueChange = { key = it }, label = { Text(if (e.index == 1) "LLM_ENGINE_API · API key / token" else "LLM_ENGINE_${e.index}_API · API key / token") },
                 visualTransformation = PasswordVisualTransformation(), singleLine = true, modifier = Modifier.fillMaxWidth()
             )
             OutlinedTextField(
-                value = url, onValueChange = { url = it }, label = { Text("LLM_ENGINE_${e.index}_BASE_URL (https://...)") },
+                value = url, onValueChange = { url = it }, label = { Text(if (e.index == 1) "LLM_PROVIDER_URL · Base URL" else "LLM_PROVIDER_${e.index}_URL · Base URL") },
                 singleLine = true, modifier = Modifier.fillMaxWidth()
             )
             OutlinedTextField(
-                value = model, onValueChange = { model = it }, label = { Text("LLM_ENGINE_${e.index}_MODEL_ID") },
+                value = model, onValueChange = { model = it }, label = { Text(if (e.index == 1) "LLM_MODEL · Model ID" else "LLM_MODEL_${e.index} · Model ID") },
                 singleLine = true, modifier = Modifier.fillMaxWidth()
             )
             OutlinedTextField(
