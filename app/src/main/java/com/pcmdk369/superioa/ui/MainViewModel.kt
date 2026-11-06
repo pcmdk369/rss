@@ -78,9 +78,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun stopRealtimeVoice() {
+        val wasExecuting = realtimeState == RealtimeVoiceState.EXECUTING
         realtimeSession?.disconnect()
         realtimeSession = null
-        if (realtimeState == RealtimeVoiceState.EXECUTING) runtime.stopTask()
+        if (wasExecuting) runtime.stopTask()
         realtimeState = RealtimeVoiceState.DISCONNECTED
     }
 
