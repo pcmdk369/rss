@@ -50,7 +50,7 @@ SuperiOA is an automation research / MVP project—not a promise of unrestricted
 | Network client | OkHttp |
 | LLM protocol | OpenAI-compatible chat completions |
 | Automation | Android AccessibilityService |
-| Speech | Android Speech Recognition + native Text-to-Speech |
+| Voice | OpenAI Realtime speech-to-speech over native WebRTC; legacy Admin Voice uses Android Speech Recognition + native TTS |
 | Local security | EncryptedSharedPreferences, Android Keystore-backed protection, validation and approval gates |
 | Build output currently documented | Debug APK (not a signed production release) |
 
@@ -71,8 +71,10 @@ SuperiOA is an automation research / MVP project—not a promise of unrestricted
 
 ### Multiple LLM engines
 - Supports configuration for up to five engines.
-- Each engine has its own enabled state, API key, HTTPS base URL, model ID and timeout settings.
-- Uses an OpenAI-compatible `POST {base-url}/chat/completions` request format.
+- Each engine has its own enabled state, API key/token, HTTPS base URL, model ID and timeout settings.
+- Provider-neutral: no vendor, company, model or API host is preselected. Configure any service that implements the OpenAI-compatible `POST {base-url}/chat/completions` contract.
+- The app accepts the provider's API key/token, base URL and exact model ID. Compatibility depends on the provider supporting the expected chat-completions request/response format.
+- Optional build-time defaults use `LLM_ENGINE_API`, `LLM_PROVIDER_URL` and `LLM_MODEL`; all may be left blank and configured in the app. Values are not hardcoded.
 - Records engine attempts and failure reasons in task results.
 - Failover is limited to planning calls; it does not retry a device-side tap or send action merely because a model request failed.
 
@@ -182,7 +184,7 @@ A previously documented successful CI run is [run 40446241841](https://github.co
 3. Enable **SuperiOA** and accept Android's system confirmation.
 4. Open **Settings → LLM engines**.
 5. Enable at least one engine and configure its API key, HTTPS base URL and exact model ID.
-6. Return to **Home**, enter or dictate a task, then press **Run**.
+6. Configure the Realtime gateway under **Settings → Realtime Voice Gateway**.\n7. Return to **Voice**, tap **Start Voice**, and speak naturally. Device tasks are routed to the Android orchestrator when Accessibility is enabled.
 7. Review and respond to any security or approval prompt. Use **Stop** to cancel an active task.
 
 The app requires a compatible configured endpoint. A key or environment variable stored on a separate server is not automatically available to the installed Android application.
@@ -242,9 +244,9 @@ Visible screen text may be sent to the LLM provider configured by the user so th
 | Android components | AndroidX Activity, Core, Lifecycle, Biometric |
 | Persistence | Room |
 | Local encrypted preferences | AndroidX Security Crypto |
-| HTTP | OkHttp |
+| HTTP / signaling | OkHttp + WebRTC |
 | Serialization | kotlinx.serialization |
-| Async execution | Kotlin Coroutines |
+| Async execution | Kotlin Coroutines |\n| Realtime media | WebRTC Android SDK (`io.github.webrtc-sdk:android`) |
 | Database code generation | KSP |
 | Unit testing | JUnit 4 |
 | Device automation | Android AccessibilityService |
@@ -259,13 +261,13 @@ SuperiOA is an actively evolving MVP. The following distinctions matter:
 | Generic action validation and bounded orchestration | Implemented; CI-compiled |
 | Accessibility-based interaction | CI-compiled; physical-device testing required |
 | Local workflow memory | Implemented |
-| Native TTS / voice input | Implemented; physical-device testing required |
+| Realtime speech-to-speech over WebRTC | Implemented in PR; Android CI and physical-device testing required |\n| Legacy Admin Voice foreground mode | Implemented; device and environment dependent |
 | Admin foreground voice mode | Implemented; device and environment dependent |
 | Browser interaction | Basic visible-UI interaction; no DOM bridge or OCR fallback |
 | OCR / vision provider | Not implemented |
 | Web search API | Not implemented |
 | Bundled on-device LLM | Not implemented |
-| Streaming generation | Not implemented |
+| Realtime audio streaming | Implemented in PR; provider and device validation pending |
 | Production release signing | Not configured; current documented artifact is a debug APK |
 | Supabase sync | Not integrated; an optional RLS schema is present |
 | Cost / token usage estimates | Not implemented |
