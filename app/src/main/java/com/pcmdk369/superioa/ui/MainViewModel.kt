@@ -60,7 +60,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             settings.realtimeClientToken,
             onState = { realtimeState = it },
             onTranscript = { chunk, final ->
-                realtimeTranscript = if (final) (realtimeTranscript + "\\n" + chunk).takeLast(6000)
+                realtimeTranscript = if (final) (realtimeTranscript + "\n" + chunk).takeLast(6000)
                     else (realtimeTranscript + chunk).takeLast(6000)
             },
             onError = { realtimeError = it },
