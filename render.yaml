@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: superioa-realtime-gateway
+    runtime: node
+    plan: free
+    region: singapore
+    rootDir: realtime-backend
+    buildCommand: npm install --omit=dev
+    startCommand: npm start
+    healthCheckPath: /health
+    autoDeployTrigger: commit
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: SUPERIOA_CLIENT_TOKEN
+        sync: false
+      - key: REALTIME_MODEL
+        value: gpt-realtime
+      - key: REALTIME_VOICE
+        value: marin
