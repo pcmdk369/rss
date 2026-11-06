@@ -4,9 +4,12 @@ import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
-import android.speech.RecognizerIntent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
+import com.pcmdk369.superioa.voice.RealtimeVoiceState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
@@ -155,160 +158,93 @@ fun OnboardingScreen(vm: MainViewModel) {
 @Composable
 fun HomeScreen(vm: MainViewModel) {
     val state by vm.state.collectAsState()
+    val voiceState = vm.realtimeState
     val a11y = rememberA11yEnabled()
-    val anyEngine = vm.engines.any { it.isUsable }
-    val running = state.status.name in setOf("PLANNING", "RUNNING", "WAITING_USER")
-    var listening by remember { mutableStateOf(false) }
-    var voiceError by remember { mutableStateOf<String?>(null) }
-
-    val speech = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        listening = false
-        val spokenCommand = result.data
-            ?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
-            ?.firstOrNull()
-            ?.trim()
-            ?.takeIf { it.isNotEmpty() }
-        if (spokenCommand != null) {
-            voiceError = null
-            if (a11y && anyEngine && !running) vm.start(spokenCommand)
-            else voiceError = "Enable Accessibility and configure an AI engine before starting a task."
-        } else {
-            voiceError = "I couldn't hear that clearly. Tap the microphone and try again."
-        }
+    val context = LocalContext.current
+    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) vm.startRealtimeVoice()
     }
-
-    val statusLabel = when {
-        listening -> "LISTENING"
-        state.status.name == "PLANNING" -> "THINKING"
-        state.status.name == "RUNNING" -> "WORKING"
-        state.status.name == "WAITING_USER" -> "NEEDS YOUR APPROVAL"
-        state.status.name == "DONE" -> "COMPLETED"
-        state.status.name == "FAILED" -> "ATTENTION REQUIRED"
-        else -> "READY"
+    val connected = voiceState !in setOf(RealtimeVoiceState.DISCONNECTED, RealtimeVoiceState.ERROR)
+    val label = when (voiceState) {
+        RealtimeVoiceState.CONNECTING -> "CONNECTING"
+        RealtimeVoiceState.LISTENING -> "LISTENING"
+        RealtimeVoiceState.THINKING -> "THINKING"
+        RealtimeVoiceState.SPEAKING -> "SPEAKING"
+        RealtimeVoiceState.EXECUTING -> "EXECUTING TASK"
+        RealtimeVoiceState.ERROR -> "CONNECTION ERROR"
+        RealtimeVoiceState.DISCONNECTED -> "READY"
     }
-
-    Column(
-        Modifier.fillMaxSize().background(Color(0xFF070B14)).verticalScroll(rememberScrollState()).padding(horizontal = 22.dp, vertical = 18.dp),
-        horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(18.dp)
-    ) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+    Column(Modifier.fillMaxSize().background(Color(0xFF070B14)).verticalScroll(rememberScrollState()).padding(horizontal = 22.dp, vertical = 18.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text("SUPERIOA", color = Color(0xFFEAF4FF), style = MaterialTheme.typography.titleLarge, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, letterSpacing = 2.sp)
-                Text("PERSONAL INTELLIGENCE", color = Color(0xFF7188A8), style = MaterialTheme.typography.labelSmall, letterSpacing = 2.sp)
+                Text("REALTIME INTELLIGENCE", color = Color(0xFF7188A8), style = MaterialTheme.typography.labelSmall, letterSpacing = 2.sp)
             }
-            Surface(color = if (a11y && anyEngine) Color(0xFF102A2A) else Color(0xFF30231F), shape = RoundedCornerShape(50)) {
-                Text(if (a11y && anyEngine) "SYSTEM READY" else "SETUP REQUIRED", modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp), color = if (a11y && anyEngine) Color(0xFF71E4C1) else Color(0xFFFFB18C), style = MaterialTheme.typography.labelSmall, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
+            Surface(color = if (connected) Color(0xFF102A2A) else Color(0xFF30231F), shape = RoundedCornerShape(50)) {
+                Text(if (connected) "LIVE SESSION" else "VOICE OFFLINE", modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp), color = if (connected) Color(0xFF71E4C1) else Color(0xFFFFB18C), style = MaterialTheme.typography.labelSmall)
             }
         }
-
-        Spacer(Modifier.height(8.dp))
-        Text(
-            when (statusLabel) {
-                "LISTENING" -> "I'm listening"
-                "THINKING" -> "Let me think"
-                "WORKING" -> "On it"
-                "NEEDS YOUR APPROVAL" -> "I need your approval"
-                "COMPLETED" -> "Task completed"
-                "ATTENTION REQUIRED" -> "I need your attention"
-                else -> "How can I help?"
-            },
-            color = Color(0xFFF1F7FF),
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = androidx.compose.ui.text.font.FontWeight.Medium
-        )
-        Text(
-            when (statusLabel) {
-                "LISTENING" -> "Speak naturally. Your voice is the interface."
-                "THINKING" -> "Understanding your request and preparing a safe plan."
-                "WORKING" -> "Carrying out the task and checking the result."
-                "NEEDS YOUR APPROVAL" -> "A sensitive action is waiting for your decision."
-                "COMPLETED" -> "Your requested workflow has finished."
-                "ATTENTION REQUIRED" -> "The task could not be completed as expected."
-                else -> "Talk to SuperiOA. No typing. No chat windows."
-            },
-            color = Color(0xFF91A8C8),
-            style = MaterialTheme.typography.bodyMedium
-        )
-
-        VoiceOrb(
-            active = listening || running,
-            thinking = state.status.name == "PLANNING",
-            speaking = state.status.name == "SUCCESS"
-        )
-
+        Spacer(Modifier.height(4.dp))
+        Text(when (voiceState) {
+            RealtimeVoiceState.CONNECTING -> "Connecting to SuperiOA"
+            RealtimeVoiceState.LISTENING -> "I am listening"
+            RealtimeVoiceState.THINKING -> "Thinking"
+            RealtimeVoiceState.SPEAKING -> "Speaking"
+            RealtimeVoiceState.EXECUTING -> "Working on your device"
+            RealtimeVoiceState.ERROR -> "Voice connection needs attention"
+            RealtimeVoiceState.DISCONNECTED -> "Talk to SuperiOA"
+        }, color = Color(0xFFF1F7FF), style = MaterialTheme.typography.headlineMedium)
+        Text(when (voiceState) {
+            RealtimeVoiceState.CONNECTING -> "Preparing a secure, temporary audio session."
+            RealtimeVoiceState.LISTENING -> "Speak naturally. You can interrupt the assistant."
+            RealtimeVoiceState.THINKING -> "Understanding your request."
+            RealtimeVoiceState.SPEAKING -> "Live voice response is streaming."
+            RealtimeVoiceState.EXECUTING -> "The Android agent is performing and verifying the task."
+            RealtimeVoiceState.ERROR -> "Check the gateway and microphone configuration in Settings."
+            RealtimeVoiceState.DISCONNECTED -> "Full-duplex voice conversation. No typing required."
+        }, color = Color(0xFF91A8C8), style = MaterialTheme.typography.bodyMedium)
+        VoiceOrb(active = connected, thinking = voiceState == RealtimeVoiceState.THINKING || voiceState == RealtimeVoiceState.EXECUTING, speaking = voiceState == RealtimeVoiceState.SPEAKING)
         Surface(color = Color(0xFF101A2B), shape = RoundedCornerShape(22.dp), modifier = Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text("VOICE SESSION", color = Color(0xFFB8CDE8), style = MaterialTheme.typography.labelMedium, letterSpacing = 1.5.sp)
-                    Text(statusLabel, color = Color(0xFF65D9FF), style = MaterialTheme.typography.labelSmall, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+                    Text(label, color = Color(0xFF65D9FF), style = MaterialTheme.typography.labelSmall, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                    VoiceStage("01", "LISTEN", listening || running)
-                    VoiceStage("02", "REASON", state.status.name == "PLANNING")
-                    VoiceStage("03", "RESPOND", state.status.name == "SUCCESS")
+                    VoiceStage("01", "LISTEN", voiceState == RealtimeVoiceState.LISTENING)
+                    VoiceStage("02", "THINK", voiceState == RealtimeVoiceState.THINKING || voiceState == RealtimeVoiceState.EXECUTING)
+                    VoiceStage("03", "SPEAK", voiceState == RealtimeVoiceState.SPEAKING)
                 }
             }
         }
-
-        if (!a11y || !anyEngine) {
-            Surface(color = Color(0xFF2B1B24), shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("SETUP NEEDED", color = Color(0xFFFFB2C0), style = MaterialTheme.typography.labelMedium, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
-                    if (!a11y) Text("Accessibility service is disabled. Enable it in Settings to let SuperiOA operate your device.", color = Color(0xFFE8C8D0), style = MaterialTheme.typography.bodySmall)
-                    if (!anyEngine) Text("No AI engine is configured. Add an endpoint in Settings to enable reasoning.", color = Color(0xFFE8C8D0), style = MaterialTheme.typography.bodySmall)
+        if (!a11y) Surface(color = Color(0xFF2B1B24), shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("DEVICE CONTROL NOT READY", color = Color(0xFFFFB2C0), style = MaterialTheme.typography.labelMedium)
+                Text("Enable SuperiOA Accessibility in Android settings to let voice commands operate your device. Voice conversation itself can work without it.", color = Color(0xFFE8C8D0), style = MaterialTheme.typography.bodySmall)
+                OutlinedButton(onClick = { context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }) { Text("Open Accessibility settings") }
+            }
+        }
+        vm.realtimeError?.let { Text(it, color = Color(0xFFFFA6A6), style = MaterialTheme.typography.bodySmall) }
+        if (vm.realtimeTranscript.isNotBlank()) Surface(color = Color(0xFF0E1726), shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
+            Text(vm.realtimeTranscript.takeLast(1200), modifier = Modifier.padding(14.dp), color = Color(0xFF9EB6D5), style = MaterialTheme.typography.bodySmall)
+        }
+        Button(onClick = {
+            if (connected) vm.stopRealtimeVoice()
+            else if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) vm.startRealtimeVoice()
+            else permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        }, modifier = Modifier.fillMaxWidth().height(60.dp), shape = RoundedCornerShape(20.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2869E8), contentColor = Color.White)) {
+            Text(if (connected) "END VOICE SESSION" else "START VOICE", fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, letterSpacing = 1.sp)
+        }
+        state.approval?.let { reason -> Surface(color = Color(0xFF2A2418), shape = RoundedCornerShape(18.dp), modifier = Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("YOUR APPROVAL IS REQUIRED", color = Color(0xFFFFD58A), style = MaterialTheme.typography.labelMedium, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+                Text(reason, color = Color(0xFFF2E4C8), style = MaterialTheme.typography.bodyMedium)
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Button(onClick = { vm.approve(true) }) { Text("Allow") }
+                    OutlinedButton(onClick = { vm.approve(false) }) { Text("Deny & stop") }
                 }
             }
-        }
-
-        voiceError?.let {
-            Text(it, color = Color(0xFFFFA6A6), style = MaterialTheme.typography.bodySmall)
-        }
-
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-            Button(
-                onClick = {
-                    voiceError = null
-                    listening = true
-                    try {
-                        speech.launch(Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
-                            .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                            .putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false)
-                            .putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak to SuperiOA"))
-                    } catch (e: ActivityNotFoundException) {
-                        listening = false
-                        voiceError = "Speech recognition is not available on this device."
-                    }
-                },
-                enabled = !running && !listening && a11y && anyEngine,
-                modifier = Modifier.weight(1f).height(58.dp),
-                shape = RoundedCornerShape(18.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2869E8), contentColor = Color.White, disabledContainerColor = Color(0xFF26344A))
-            ) {
-                Text(if (listening) "LISTENING…" else "●  TALK TO SUPERIOA", fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, letterSpacing = 1.sp)
-            }
-            OutlinedButton(
-                onClick = { vm.stop(); listening = false },
-                enabled = running,
-                modifier = Modifier.height(58.dp),
-                shape = RoundedCornerShape(18.dp),
-                border = BorderStroke(1.dp, Color(0xFF536985))
-            ) { Text("STOP", color = Color(0xFFFFA7B2), fontWeight = androidx.compose.ui.text.font.FontWeight.Bold) }
-        }
-
-        state.approval?.let { reason ->
-            Surface(color = Color(0xFF2A2418), shape = RoundedCornerShape(18.dp), modifier = Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("YOUR APPROVAL IS REQUIRED", color = Color(0xFFFFD58A), style = MaterialTheme.typography.labelMedium, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
-                    Text(reason, color = Color(0xFFF2E4C8), style = MaterialTheme.typography.bodyMedium)
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Button(onClick = { vm.approve(true) }) { Text("Allow") }
-                        OutlinedButton(onClick = { vm.approve(false) }) { Text("Deny & stop") }
-                    }
-                }
-            }
-        }
-
+        } }
         Spacer(Modifier.height(8.dp))
     }
 }
@@ -423,6 +359,18 @@ fun SettingsScreen(vm: MainViewModel) {
                     Text("SuperiOA speaks task results aloud using Android voice.", color = Color(0xFF91A8C8), style = MaterialTheme.typography.bodySmall)
                 }
                 Switch(checked = vm.tts, onCheckedChange = { vm.setTts(it) })
+            }
+        }
+
+        var gatewayUrl by remember { mutableStateOf(vm.realtimeGatewayUrl) }
+        var gatewayToken by remember { mutableStateOf(vm.realtimeClientToken) }
+        Surface(color = Color(0xFF101A2B), shape = RoundedCornerShape(20.dp), modifier = Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("REALTIME VOICE GATEWAY", color = Color(0xFFB8CDE8), style = MaterialTheme.typography.labelMedium, letterSpacing = 1.2.sp)
+                Text("The gateway keeps the long-lived provider key on the server and issues short-lived session credentials to this device.", color = Color(0xFF91A8C8), style = MaterialTheme.typography.bodySmall)
+                OutlinedTextField(value = gatewayUrl, onValueChange = { gatewayUrl = it }, label = { Text("Gateway HTTPS URL") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = gatewayToken, onValueChange = { gatewayToken = it }, label = { Text("Device access token") }, visualTransformation = PasswordVisualTransformation(), singleLine = true, modifier = Modifier.fillMaxWidth())
+                Button(enabled = gatewayUrl.startsWith("https://") && gatewayToken.isNotBlank(), onClick = { vm.saveRealtimeSettings(gatewayUrl, gatewayToken) }) { Text("Save Realtime settings") }
             }
         }
 
