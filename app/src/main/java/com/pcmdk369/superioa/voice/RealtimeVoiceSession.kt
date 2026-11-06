@@ -128,7 +128,7 @@ class RealtimeVoiceSession(
         val observer = object : PeerConnection.Observer {
             override fun onSignalingChange(state: PeerConnection.SignalingState) = Unit
             override fun onIceConnectionChange(state: PeerConnection.IceConnectionState) {
-                if (state == PeerConnection.IceConnectionState.FAILED || state == PeerConnection.IceConnectionState.DISCONNECTED) {
+                if (state == PeerConnection.IceConnectionState.FAILED) {
                     if (!closed.get()) fail("Realtime audio network connection was interrupted.")
                 }
             }
