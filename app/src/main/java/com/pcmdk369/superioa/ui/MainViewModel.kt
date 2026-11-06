@@ -119,4 +119,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { db.logs().clear() }
     }
 
+
+    override fun onCleared() {
+        realtimeSession?.disconnect()
+        realtimeSession = null
+        super.onCleared()
+    }
 }
