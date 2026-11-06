@@ -4,10 +4,10 @@
 
 The Home screen uses a persistent full-duplex audio session instead of Android's one-shot SpeechRecognizer and native TextToSpeech chain.
 
-- Microphone: Android AudioRecord, mono signed PCM16 at 24 kHz.
-- Transport: secure WebSocket to the Realtime API.
+- Microphone: Native WebRTC audio capture with hardware acoustic echo cancellation and noise suppression.
+- Transport: WebRTC peer connection to the Realtime API.
 - Input turn detection: server-side VAD.
-- Output playback: Android AudioTrack streaming PCM16 at 24 kHz.
+- Output playback: Native WebRTC audio playout with platform-managed jitter buffering.
 - Barge-in: server VAD interrupts the response; local playback is flushed when speech-start is received.
 - Conversation: provider-managed session context during the active session.
 - Device execution: Realtime function call execute_android_task hands a natural-language goal to the existing validated Android orchestrator.
@@ -47,10 +47,10 @@ Do not add secret values to GitHub, source code, or screenshots.
 
 - [ ] Render health check is green and configured is true.
 - [ ] App obtains a temporary client secret without exposing the provider key.
-- [ ] WebSocket session opens and microphone capture starts only after session.created.
+- [ ] WebRTC SDP negotiation succeeds, the data channel opens, and microphone capture starts only after permission and peer setup.
 - [ ] User speech triggers server VAD and a spoken response.
 - [ ] Assistant audio streams without waiting for a complete audio file.
-- [ ] Speaking over the assistant interrupts/flushes local playback.
+- [ ] Speaking over the assistant triggers server VAD barge-in; WebRTC manages the audio track and playout.
 - [ ] Device-task requests call the orchestrator and honor approvals.
 - [ ] Stop ends microphone capture and releases AudioRecord/AudioTrack.
 - [ ] Airplane mode, gateway 401/429/5xx, permission denial, and audio initialization failures show recoverable errors.
