@@ -76,6 +76,7 @@ app.post("/v1/realtime/client-secret", rateLimit, async (req, res) => {
             input: {
               format: { type: "audio/pcm", rate: 24000 },
               noise_reduction: { type: "near_field" },
+              transcription: { model: "whisper-1" },
               turn_detection: { type: "server_vad", threshold: 0.5, prefix_padding_ms: 300, silence_duration_ms: 550 }
             },
             output: {
