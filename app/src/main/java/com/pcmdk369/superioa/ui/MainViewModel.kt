@@ -8,6 +8,8 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.pcmdk369.superioa.llm.EngineConfig
 import com.pcmdk369.superioa.runtime.AgentRuntime
+import com.pcmdk369.superioa.voice.RealtimeVoiceSession
+import com.pcmdk369.superioa.voice.RealtimeVoiceState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -30,7 +32,57 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     var tts by mutableStateOf(settings.ttsEnabled)
         private set
 
+    var realtimeState by mutableStateOf(RealtimeVoiceState.DISCONNECTED)
+        private set
+    var realtimeTranscript by mutableStateOf("")
+        private set
+    var realtimeError by mutableStateOf<String?>(null)
+        private set
+
+    private var realtimeSession: RealtimeVoiceSession? = null
     private var job: Job? = null
+
+    val realtimeGatewayUrl: String get() = settings.realtimeGatewayUrl
+    val realtimeClientToken: String get() = settings.realtimeClientToken
+
+    fun saveRealtimeSettings(url: String, token: String) {
+        settings.realtimeGatewayUrl = url
+        settings.realtimeClientToken = token
+    }
+
+    fun startRealtimeVoice() {
+        if (realtimeState != RealtimeVoiceState.DISCONNECTED && realtimeState != RealtimeVoiceState.ERROR) return
+        realtimeError = null
+        realtimeTranscript = ""
+        val session = RealtimeVoiceSession(
+            getApplication(),
+            settings.realtimeGatewayUrl,
+            settings.realtimeClientToken,
+            onState = { realtimeState = it },
+            onTranscript = { chunk, final ->
+                realtimeTranscript = if (final) (realtimeTranscript + "\\n" + chunk).takeLast(6000)
+                    else (realtimeTranscript + chunk).takeLast(6000)
+            },
+            onError = { realtimeError = it },
+            executeAndroidTask = { goal ->
+                val task = runtime.launchTask(viewModelScope, goal, speakResult = false)
+                if (task == null) "Another Android task is already running."
+                else {
+                    task.join()
+                    runtime.orchestrator.state.value.finalMessage ?: "The Android task ended without a verified result."
+                }
+            }
+        )
+        realtimeSession = session
+        session.connect()
+    }
+
+    fun stopRealtimeVoice() {
+        realtimeSession?.disconnect()
+        realtimeSession = null
+        if (realtimeState == RealtimeVoiceState.EXECUTING) runtime.stopTask()
+        realtimeState = RealtimeVoiceState.DISCONNECTED
+    }
 
     fun start(goal: String) {
         if (goal.isBlank()) return
