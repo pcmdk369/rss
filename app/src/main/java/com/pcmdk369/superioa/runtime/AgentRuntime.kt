@@ -30,7 +30,7 @@ class AgentRuntime private constructor(context: Context) {
 
     @Volatile private var activeTask: Job? = null
 
-    fun launchTask(scope: CoroutineScope, goal: String): Job? = synchronized(this) {
+    fun launchTask(scope: CoroutineScope, goal: String, speakResult: Boolean = true): Job? = synchronized(this) {
         val status = orchestrator.state.value.status
         if (activeTask?.isActive == true ||
             status == com.pcmdk369.superioa.orchestrator.TaskStatus.PLANNING ||
@@ -38,7 +38,7 @@ class AgentRuntime private constructor(context: Context) {
             status == com.pcmdk369.superioa.orchestrator.TaskStatus.WAITING_USER
         ) return null
 
-        val task = scope.launch(Dispatchers.Default) { orchestrator.run(goal.trim()) }
+        val task = scope.launch(Dispatchers.Default) { orchestrator.run(goal.trim(), speakResult) }
         activeTask = task
         task.invokeOnCompletion {
             synchronized(this) {
