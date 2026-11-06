@@ -260,9 +260,20 @@ class RealtimeVoiceSession(
     }
 
     private fun fail(message: String) {
-        if (closed.get()) return
+        if (!closed.compareAndSet(false, true)) return
         onError(message)
+        micRunning.set(false)
+        playbackRunning.set(false)
+        socket?.close(1011, "Realtime session failed")
+        runCatching { recorder?.stop() }
+        runCatching { recorder?.release() }
+        runCatching { player?.pause(); player?.flush(); player?.release() }
+        recorder = null
+        player = null
+        audioQueue.clear()
+        micThread?.interrupt()
+        playbackThread?.interrupt()
+        scope.cancel()
         onState(RealtimeVoiceState.ERROR)
-        disconnect()
     }
 }
