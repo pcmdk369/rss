@@ -182,7 +182,7 @@ A previously documented successful CI run is [run 40446241841](https://github.co
 3. Enable **SuperiOA** and accept Android's system confirmation.
 4. Open **Settings → LLM engines**.
 5. Enable at least one engine and configure its API key, HTTPS base URL and exact model ID.
-6. Return to **Home**, enter or dictate a task, then press **Run**.
+6. Configure the Realtime gateway under **Settings → Realtime Voice Gateway**.\n7. Return to **Voice**, tap **Start Voice**, and speak naturally. Device tasks are routed to the Android orchestrator when Accessibility is enabled.
 7. Review and respond to any security or approval prompt. Use **Stop** to cancel an active task.
 
 The app requires a compatible configured endpoint. A key or environment variable stored on a separate server is not automatically available to the installed Android application.
