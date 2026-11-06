@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.media.AudioManager
 import androidx.core.content.ContextCompat
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -53,6 +54,21 @@ class RealtimeVoiceSession(
     private val onError: (String) -> Unit,
     private val executeAndroidTask: suspend (String) -> String
 ) {
+    companion object {
+        @Volatile private var factoryInitialized = false
+        private fun ensureFactoryInitialized(context: Context) {
+            if (factoryInitialized) return
+            synchronized(RealtimeVoiceSession::class.java) {
+                if (!factoryInitialized) {
+                    PeerConnectionFactory.initialize(
+                        PeerConnectionFactory.InitializationOptions.builder(context).createInitializationOptions()
+                    )
+                    factoryInitialized = true
+                }
+            }
+        }
+    }
+
     private val app = context.applicationContext
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val http = OkHttpClient.Builder()
@@ -106,9 +122,7 @@ class RealtimeVoiceSession(
     }
 
     private suspend fun negotiateWebRtc(secret: String) {
-        PeerConnectionFactory.initialize(
-            PeerConnectionFactory.InitializationOptions.builder(app).createInitializationOptions()
-        )
+        ensureFactoryInitialized(app)
         val adm = JavaAudioDeviceModule.builder(app)
             .setUseHardwareAcousticEchoCanceler(true)
             .setUseHardwareNoiseSuppressor(true)
@@ -265,7 +279,9 @@ class RealtimeVoiceSession(
         }
         onState(RealtimeVoiceState.EXECUTING)
         scope.launch {
-            val result = try { executeAndroidTask(goal) } catch (e: Exception) {
+            val result = try { executeAndroidTask(goal) } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
                 "The task failed: ${e.message ?: "unknown error"}"
             }
             sendToolResult(callId, result)
