@@ -23,30 +23,21 @@ class SettingsStore(context: Context) {
         var model = prefs.getString("e${i}_model", "") ?: ""
         var enabled = prefs.getBoolean("e${i}_on", false)
 
+        // Optional build-time defaults are provider-neutral. No vendor or model is selected for users.
         if (i == 1) {
-            val envKey = BuildConfig.LLM_ENGINE_KEY
-            if (key.isBlank() && envKey.isNotBlank() && envKey != "LLM_ENGINE_KEY_DEFAULT_VALUE") {
-                key = envKey
-                if (!prefs.contains("e1_on")) enabled = true
-            }
-            // NVIDIA accepts the API root; normalize users who paste the full endpoint.
-            if (url.isBlank()) url = "https://integrate.api.nvidia.com/v1"
-            url = url.trim().trimEnd('/')
-            if (url.endsWith("/chat/completions", ignoreCase = true)) {
-                url = url.substringBeforeLast("/chat/completions").trimEnd('/')
-            }
-
-            // The hosted Super-49B endpoint was retired in August 2026. Migrate its old default.
-            if (model.isBlank() || model == "meta/llama-3.3-nemotron-super-49b-v1.5" ||
-                model == "nvidia/llama-3.3-nemotron-super-49b-v1.5") {
-                model = "nvidia/nemotron-3-nano-30b-a3b"
-            }
+            val envKey = BuildConfig.LLM_ENGINE_API
+            val envUrl = BuildConfig.LLM_PROVIDER_URL
+            val envModel = BuildConfig.LLM_MODEL
+            if (key.isBlank() && envKey.isNotBlank() && envKey != "LLM_ENGINE_API_DEFAULT_VALUE") key = envKey
+            if (url.isBlank() && envUrl.isNotBlank() && envUrl != "LLM_PROVIDER_URL_DEFAULT_VALUE") url = envUrl
+            if (model.isBlank() && envModel.isNotBlank() && envModel != "LLM_MODEL_DEFAULT_VALUE") model = envModel
+            if (!prefs.contains("e1_on") && key.isNotBlank() && url.isNotBlank() && model.isNotBlank()) enabled = true
         }
 
         EngineConfig(
             index = i,
             apiKey = key,
-            baseUrl = url,
+            baseUrl = url.trim().trimEnd('/'),
             modelId = model,
             enabled = enabled,
             timeoutSec = prefs.getInt("e${i}_timeout", 30),
